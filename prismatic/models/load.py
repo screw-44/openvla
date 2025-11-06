@@ -20,6 +20,8 @@ from prismatic.models.vlms import PrismaticVLM
 from prismatic.overwatch import initialize_overwatch
 from prismatic.vla.action_tokenizer import ActionTokenizer
 
+from prismatic.util.hf_utils import find_model_in_cache
+
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
 
@@ -56,7 +58,8 @@ def load(
     load_for_training: bool = False,
 ) -> PrismaticVLM:
     """Loads a pretrained PrismaticVLM from either local disk or the HuggingFace Hub."""
-    if os.path.isdir(model_id_or_path):
+    flag, model_id_or_path = find_model_in_cache(model_id_or_path)
+    if flag:
         overwatch.info(f"Loading from local path `{(run_dir := Path(model_id_or_path))}`")
 
         # Get paths for `config.json` and pretrained checkpoint
@@ -129,7 +132,8 @@ def load_vla(
 ) -> OpenVLA:
     """Loads a pretrained OpenVLA from either local disk or the HuggingFace Hub."""
 
-    # TODO (siddk, moojink) :: Unify semantics with `load()` above; right now, `load_vla()` assumes path points to
+    # TODO (siddk, moojink) :: hxy,什么沙比代码，重构！！！！
+    # Unify semantics with `load()` above; right now, `load_vla()` assumes path points to
     #   checkpoint `.pt` file, rather than the top-level run directory!
     if os.path.isfile(model_id_or_path):
         overwatch.info(f"Loading from local checkpoint path `{(checkpoint_pt := Path(model_id_or_path))}`")

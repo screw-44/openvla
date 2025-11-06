@@ -40,7 +40,7 @@ LLAMA2_MODELS = {
         "llm_family": "llama2", "llm_cls": LlamaForCausalLM, "hf_hub_path": "meta-llama/Llama-2-13b-chat-hf"
     },
 
-    # === Vicuna v1.5 Chat Models ===
+    # === Vicuna v1.5 Chat Models, "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/huggingface/hub/models--lmsys--vicuna-7b-v1.5/snapshots/3321f76e3f527bd14065daf69dad9344000a201d"  ===        
     "vicuna-v15-7b": {
         "llm_family": "llama2", "llm_cls": LlamaForCausalLM, "hf_hub_path": "lmsys/vicuna-7b-v1.5"
     },
