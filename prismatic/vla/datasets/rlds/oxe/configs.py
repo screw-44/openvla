@@ -670,4 +670,11 @@ OXE_DATASET_CONFIGS = {
         "state_encoding": StateEncoding.POS_EULER,
         "action_encoding": ActionEncoding.EEF_POS,
     },
+    "custom_trajectory_dataset": {
+        "image_obs_keys": {"primary": "rgb", "secondary": None, "wrist": None},
+        "depth_obs_keys": {"primary": None, "secondary": None, "wrist": None},
+        "state_obs_keys": ["object_pose", None, "gripper_state"],  # 9D object pose
+        "state_encoding": StateEncoding.POS_QUAT,  # 9D includes quaternion
+        "action_encoding": ActionEncoding.EEF_POS,  # 9D action encoding
+    },
 }

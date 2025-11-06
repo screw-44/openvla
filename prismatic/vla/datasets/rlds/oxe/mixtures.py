@@ -24,6 +24,11 @@ OXE_NAMED_MIXTURES: Dict[str, List[Tuple[str, float]]] = {
         ("fractal20220817_data", 1.0),                          # Google RT-1 Robot Data (Large-Scale)
     ],
 
+    # === Custom Trajectory Dataset ===
+    "custom_trajectory": [
+        ("custom_trajectory_dataset", 1.0),                     # Custom trajectory dataset with 9D poses
+    ],
+
     # === RT-X Mixtures ===
     "rtx": [
         ("fractal20220817_data", 0.54087122203),                # Google RT-1 Robot Data (Large-Scale)
