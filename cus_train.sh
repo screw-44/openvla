@@ -37,10 +37,10 @@ torchrun --standalone --nnodes 1 --nproc-per-node 4 vla-scripts/train.py \
   --save_interval "${SAVE_INTERVAL}" \
   --wandb_project "${WANDB_PROJECT}" \
   --wandb_entity "${WANDB_ENTITY}" \
-  --is_resume "${IS_RESUME}" \
-  --resume_step "${RESUME_STEP}" \
-  --resume_epoch "${RESUME_EPOCH}" \
-  --pretrained_checkpoint "${PRETRAINED_CKPT}" \
+  # --is_resume "${IS_RESUME}" \
+  # --resume_step "${RESUME_STEP}" \
+  # --resume_epoch "${RESUME_EPOCH}" \
+  # --pretrained_checkpoint "${PRETRAINED_CKPT}" \
   # To resume, append the following (and ensure names match the checkpoint):
   # --pretrained_checkpoint "${PRETRAINED_CKPT}" \
   # --is_resume "${IS_RESUME}" \

@@ -73,9 +73,11 @@ def find_model_in_cache(model_id: str) -> Tuple[bool, str]:
     
     This function searches for the model in the snapshots subdirectory of HF cache.
     It automatically detects HF cache directories and looks for the model.
+    Supports sub-paths like 'TRI-ML/prismatic-vlms/siglip-224px+7b'.
     
     Args:
-        model_id: The model ID to search for (e.g., 'bert-base-uncased', 'facebook/sam-vit-base')
+        model_id: The model ID to search for (e.g., 'bert-base-uncased', 'facebook/sam-vit-base',
+                  'TRI-ML/prismatic-vlms/siglip-224px+7b')
         
     Returns:
         Tuple of (found: bool, path: str)
@@ -90,10 +92,22 @@ def find_model_in_cache(model_id: str) -> Tuple[bool, str]:
         logger.warning("No Hugging Face cache directories found")
         return False, model_id
     
-    # Normalize the model ID for directory search
-    normalized_model_id = normalize_model_id(model_id)
+    # Parse model_id to extract base model and sub-path
+    # e.g., 'TRI-ML/prismatic-vlms/siglip-224px+7b' -> ('TRI-ML/prismatic-vlms', 'siglip-224px+7b')
+    parts = model_id.split('/')
+    if len(parts) > 2:
+        # Has sub-path: 'owner/repo/subpath' or 'owner/repo/sub1/sub2/...'
+        base_model_id = '/'.join(parts[:2])
+        sub_path = '/'.join(parts[2:])
+    else:
+        # No sub-path: 'owner/repo' or 'model'
+        base_model_id = model_id
+        sub_path = None
     
-    logger.info(f"Searching for model: {model_id} (normalized: {normalized_model_id})")
+    # Normalize the base model ID for directory search
+    normalized_model_id = normalize_model_id(base_model_id)
+    
+    logger.info(f"Searching for model: {model_id} (base: {base_model_id}, normalized: {normalized_model_id}, sub_path: {sub_path})")
     logger.info(f"Searching in cache directories: {cache_dirs}")
     
     for cache_dir in cache_dirs:
@@ -120,11 +134,21 @@ def find_model_in_cache(model_id: str) -> Tuple[bool, str]:
                 logger.debug(f"No snapshot subdirectories found in: {snapshots_dir}")
                 continue
             
-            # Return the first (and usually only) snapshot directory
+            # Use the first (and usually only) snapshot directory
             snapshot_path = os.path.join(snapshots_dir, snapshot_subdirs[0])
             
-            logger.info(f"Found model at: {snapshot_path}")
-            return True, snapshot_path
+            # If there's a sub-path, append it
+            if sub_path:
+                final_path = os.path.join(snapshot_path, sub_path)
+                if os.path.isdir(final_path):
+                    logger.info(f"Found model at: {final_path}")
+                    return True, final_path
+                else:
+                    logger.debug(f"Sub-path not found: {final_path}")
+                    continue
+            else:
+                logger.info(f"Found model at: {snapshot_path}")
+                return True, snapshot_path
             
         except Exception as e:
             logger.error(f"Error searching in {cache_dir}: {e}")
@@ -216,7 +240,8 @@ if __name__ == "__main__":
             'facebook/sam-vit-base',
             'lmsys/vicuna-7b-v1.5',
             'TRI-ML/prismatic-vlms',
-            'timm/ViT-SO400M-14-SigLIP'
+            'timm/ViT-SO400M-14-SigLIP',
+            'TRI-ML/prismatic-vlms/siglip-224px+7b'
         ]
         
         print("Testing model search:")

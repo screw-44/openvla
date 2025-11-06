@@ -198,6 +198,40 @@ class Exp_SigLIP_224px_Droid_Wipe(Exp_SigLIP_224px_Bridge):
     data_mix: str = "droid_wipe"
 
 
+# === [1 GPU] Lightweight Custom Trajectory Training ===
+@dataclass
+class Exp_SigLIP_224px_Custom_Trajectory(VLAConfig):
+    vla_id: str = "siglip-224px+custom-trajectory"
+    base_vlm: Union[str, Path] = "TRI-ML/prismatic-vlms/siglip-224px+7b"
+
+    freeze_vision_backbone: bool = False
+    freeze_llm_backbone: bool = False  
+    unfreeze_last_llm_layer: bool = False
+
+    # Data Mixture Parameters - using custom dataset
+    data_mix: str = "custom_trajectory"
+    shuffle_buffer_size: int = 256_000 # Smaller buffer for lightweight training
+
+    # Optimization Parameters - optimized for single GPU
+    epochs: int = 10
+    max_steps: Optional[int] = None
+
+    expected_world_size: int = 4  
+    global_batch_size: int = 256  
+    per_device_batch_size: int = 64
+
+    learning_rate: float = 5e-5   # Slightly higher LR for faster convergence
+    weight_decay: float = 0.01    # Add some regularization
+    max_grad_norm: float = 1.0
+    lr_scheduler_type: str = "linear-warmup+cosine-decay"
+    warmup_ratio: float = 0.1     # 10% warmup
+
+    train_strategy: str = "fsdp-full-shard"
+    
+    use_flash_attention_2: bool = False
+    enable_mixed_precision_training: bool = True
+
+
 # === Define a VLA Registry Enum for Reference & Validation ===
 @unique
 class VLARegistry(Enum):
@@ -224,6 +258,9 @@ class VLARegistry(Enum):
 
     # === DROID Fine-tuning Configs ===
     SIGLIP_224PX_MX_DROID_WIPE = Exp_SigLIP_224px_Droid_Wipe
+
+    # === Custom Trajectory Training ===
+    SIGLIP_224PX_CUSTOM_TRAJECTORY = Exp_SigLIP_224px_Custom_Trajectory
 
     @property
     def vla_id(self) -> str:
