@@ -37,6 +37,14 @@ from prismatic.vla.datasets.rlds.utils.data_utils import save_dataset_statistics
 
 # Sane Defaults
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+# 屏蔽tensorflow日志 / 屏蔽warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+import warnings
+from pydantic.warnings import UnsupportedFieldAttributeWarning
+warnings.filterwarnings("ignore", category=UnsupportedFieldAttributeWarning)
+
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 # Initialize Overwatch =>> Wraps `logging.Logger`
@@ -79,6 +87,10 @@ class TrainConfig:
     trackers: Tuple[str, ...] = ("jsonl", "wandb")                  # Trackers to initialize (if W&B, add config!)
     wandb_project: str = "openvla"                                  # Name of W&B project to log to (use default!)
     wandb_entity: str = "stanford-voltron"                          # Name of entity to log under
+    
+    # Testing Parameters
+    is_test: bool = False                                            # Whether we are in testing mode
+    test_save_dir: Optional[Path] = None                            # Directory to save test results
 
     def __post_init__(self) -> None:
         """Lift optimization parameters from `self.vla` for ease of use =>> validate on `expected_world_size`"""
@@ -146,7 +158,7 @@ def train(cfg: TrainConfig) -> None:
         if cfg.is_resume:
             assert int(re.search("step-(.+?)-", cfg.pretrained_checkpoint.name).group(1)) == cfg.resume_step
             assert int(re.search("epoch-(.+?)-", cfg.pretrained_checkpoint.name).group(1)) == cfg.resume_epoch
-
+        print("[*] Loading VLA from Checkpoint:", cfg.pretrained_checkpoint)
         vlm = load_vla(cfg.pretrained_checkpoint, hf_token=hf_token, load_for_training=True)
 
     else:
@@ -226,32 +238,42 @@ def train(cfg: TrainConfig) -> None:
     )
     train_strategy.run_setup(run_dir=run_dir, n_train_examples=len(vla_dataset))
 
-    # Create Metrics =>> Handles on the fly tracking, logging to specified trackers (e.g., JSONL, Weights & Biases)
-    overwatch.info(f"Creating Metrics with Active Trackers => `{cfg.trackers}`")
-    metrics = VLAMetrics(
-        cfg.trackers,
-        cfg.run_id,
-        run_dir,
-        draccus.encode(cfg),
-        wandb_project=cfg.wandb_project,
-        wandb_entity=cfg.wandb_entity,
-        resume_step=cfg.resume_step,
-        resume_epoch=cfg.resume_epoch,
-    )
+    # Run VLA Training Loop or Testing
+    if cfg.is_test:
+        overwatch.info("Starting VLA Testing Loop")
+        train_strategy.run_vla_testing(
+            vla_dataset,
+            collator,
+            action_tokenizer,
+            test_save_dir=cfg.test_save_dir,
+        )
+        overwatch.info("Done with Testing")
+    else:
+        overwatch.info("Starting VLA Training Loop")
 
-    # Run VLA Training
-    overwatch.info("Starting VLA Training Loop")
-    train_strategy.run_vla_training(
-        vla_dataset,
-        collator,
-        action_tokenizer,
-        metrics,
-        save_interval=cfg.save_interval,
-    )
+        # Create Metrics =>> Handles on the fly tracking, logging to specified trackers (e.g., JSONL, Weights & Biases)
+        overwatch.info(f"Creating Metrics with Active Trackers => `{cfg.trackers}`")
+        metrics = VLAMetrics(
+            cfg.trackers,
+            cfg.run_id,
+            run_dir,
+            draccus.encode(cfg),
+            wandb_project=cfg.wandb_project,
+            wandb_entity=cfg.wandb_entity,
+            resume_step=cfg.resume_step,
+            resume_epoch=cfg.resume_epoch,
+        )
 
-    # Finalize
-    overwatch.info("Done with Training =>> Finalizing Metrics")
-    metrics.finalize()
+        train_strategy.run_vla_training(
+            vla_dataset,
+            collator,
+            action_tokenizer,
+            metrics,
+            save_interval=cfg.save_interval,
+        )
+        # Finalize
+        overwatch.info("Done with Training =>> Finalizing Metrics")
+        metrics.finalize()
 
     # And... we're done!
     overwatch.info("... and that's all, folks!")
