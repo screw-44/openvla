@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 在不能联网的机器上，设置为离线模式
-export WANDB_MODE=offline
-# 仅本地查找（禁用一切联网）
-export HF_HUB_OFFLINE=1
-export TRANSFORMERS_OFFLINE=1
-export HF_DATASETS_OFFLINE=1
+# Stop Warnings（这个是莫名其妙什么奇怪的高层库里面的warninig，贼逆天）
+export PYTHONWARNINGS="ignore::UserWarning:pydantic._internal._generate_schema,ignore:UnsupportedFieldAttributeWarning"
+# '2' 会屏蔽 INFO 和 WARNING 级别的日志，能有效清理大部分噪音
+export TF_CPP_MIN_LOG_LEVEL=2
+# 3. torch警告
+export OMP_NUM_THREADS=1
+# cuda warning
+export TF_CPP_MIN_LOG_LEVEL=3
 
 # Paths
 # Resolve script directory and use dataset relative to the script location so the

@@ -37,11 +37,6 @@ from prismatic.vla.datasets.rlds.utils.data_utils import save_dataset_statistics
 
 # Sane Defaults
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-# 屏蔽tensorflow日志 / 屏蔽warnings
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-import warnings
-from pydantic.warnings import UnsupportedFieldAttributeWarning
-warnings.filterwarnings("ignore", category=UnsupportedFieldAttributeWarning)
 
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

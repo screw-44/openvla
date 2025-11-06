@@ -217,8 +217,8 @@ class Exp_SigLIP_224px_Custom_Trajectory(VLAConfig):
     max_steps: Optional[int] = None
 
     expected_world_size: int = 4  
-    global_batch_size: int = 256  
-    per_device_batch_size: int = 64
+    global_batch_size: int = 64  
+    per_device_batch_size: int = 16
 
     learning_rate: float = 5e-5   # Slightly higher LR for faster convergence
     weight_decay: float = 0.01    # Add some regularization
