@@ -1,14 +1,10 @@
 """
 train.py
+目前暂时不修改这个名字，暂时认为全量微调是更好的训练方式，lora的代码我们保留但是不进行主线开发。
 
 Training script for Vision-Language-Action (VLA) Policies, built on top of pretrained VLMs, trained using mixtures of
 the Open-X Embodiment dataset. Performs training in native PyTorch, using Fully-Sharded Data Parallel (FSDP) to run
-distributed across GPUs (and nodes). By default, assumes that CUDA toolkit is >= 11.0 (to support BF16 mixed precision).
-
-Notes & Prerequisites:
-    - If you want to set a custom location for all HF / TIMM artifacts --> `export HF_HOME="<PATH>"` *before* running!
-        => For example (add to end of .bashrc): `export HF_HOME="/mnt/fsx/skaramcheti/cache"`
-    - If you want to suppress random Tensorflow logs --> `export TF_CPP_MIN_LOG_LEVEL=3`
+distributed across GPUs (and nodes). 
 
 Run with:
     - [Single Node One-GPU (Debug)] : torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/train.py
@@ -17,6 +13,9 @@ Run with:
 
 import json
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -27,6 +26,7 @@ import torch
 import torch.distributed as dist
 import yaml
 
+from prismatic.conf.run import RunConfig
 from prismatic.conf import VLAConfig, VLARegistry
 from prismatic.models import load, load_vla
 from prismatic.overwatch import initialize_overwatch
@@ -38,80 +38,17 @@ from prismatic.vla.datasets.rlds.utils.data_utils import save_dataset_statistics
 # Sane Defaults
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
 
 
-@dataclass
-class TrainConfig:
-    # fmt: off
-
-    # VLAConfig (`prismatic/conf/vla.py`); override with --vla.type `VLARegistry.<VLA>.vla_id`
-    vla: VLAConfig = field(
-        default_factory=VLAConfig.get_choice_class(VLARegistry.DINOSIGLIP_224PX_MX_OXE_MAGIC_SOUP_PLUS.vla_id)
-    )
-
-    # Directory Paths
-    data_root_dir: Path = Path(                                     # Path to Open-X dataset directory
-        "datasets/open-x-embodiment"
-    )
-    run_root_dir: Path = Path("runs")                               # Path to directory to store logs & checkpoints
-
-    # Resume Run Parameters
-    pretrained_checkpoint: Optional[Path] = None                    # Absolute Path to Checkpoint
-    is_resume: bool = True                                          # Whether we are continuing a prior training run
-                                                                    #   (only applicable given pretrained checkpoint)
-    resume_step: Optional[int] = None                               # Global Step to Resume (should match checkpoint)
-    resume_epoch: Optional[int] = None                              # Epoch to Resume (should match checkpoint)
-
-    # Run Arguments
-    run_id: Optional[str] = None                                    # Run ID for logging, Weights & Biases
-    run_id_note: Optional[str] = None                               # Extra note for logging, Weights & Biases
-    save_interval: int = 2500                                       # Interval for saving checkpoints (in steps)
-    image_aug: bool = False                                         # Whether to enable image augmentations
-    seed: int = 7                                                   # Random seed (for reproducibility)
-
-    # HF Hub Credentials (for any gated models)
-    hf_token: Union[str, Path] = Path(".hf_token")                  # Environment variable or Path to HF Token
-
-    # Tracking Parameters
-    trackers: Tuple[str, ...] = ("jsonl", "wandb")                  # Trackers to initialize (if W&B, add config!)
-    wandb_project: str = "openvla"                                  # Name of W&B project to log to (use default!)
-    wandb_entity: str = "stanford-voltron"                          # Name of entity to log under
-    
-    # Testing Parameters
-    is_test: bool = False                                            # Whether we are in testing mode
-    test_save_dir: Optional[Path] = None                            # Directory to save test results
-
-    def __post_init__(self) -> None:
-        """Lift optimization parameters from `self.vla` for ease of use =>> validate on `expected_world_size`"""
-        self.epochs = self.vla.epochs
-        self.max_steps = self.vla.max_steps
-        self.global_batch_size = self.vla.global_batch_size
-        self.per_device_batch_size = self.vla.per_device_batch_size
-
-        self.learning_rate = self.vla.learning_rate
-        self.weight_decay = self.vla.weight_decay
-        self.max_grad_norm = self.vla.max_grad_norm
-        self.lr_scheduler_type = self.vla.lr_scheduler_type
-        self.warmup_ratio = self.vla.warmup_ratio
-
-        self.train_strategy = self.vla.train_strategy
-
-        # [Validate] Assert on `expected_world_size`
-        assert (
-            self.vla.expected_world_size == overwatch.world_size()
-        ), f"Expected World Size = {self.vla.expected_world_size} but Found {overwatch.world_size()} GPUs!"
-
-    # fmt: on
-
-
 @draccus.wrap()
-def train(cfg: TrainConfig) -> None:
+def train(cfg: RunConfig) -> None:
+    # print("[*] Starting VLA Training with Configuration:\n", cfg)
+    # assert cfg.vla.expected_world_size == overwatch.world_size(), (
+    #     f"Expected World Size = {cfg.vla.expected_world_size} but Found {overwatch.world_size()} GPUs!"
+    # )
+
     overwatch.info("OpenVLA Training :: Warming Up")
 
     # Note => Under `torchrun` initializing `overwatch` will automatically set up `torch.distributed`
@@ -240,7 +177,7 @@ def train(cfg: TrainConfig) -> None:
             vla_dataset,
             collator,
             action_tokenizer,
-            test_save_dir=cfg.test_save_dir,
+            test_cfg=cfg.test,
         )
         overwatch.info("Done with Testing")
     else:
@@ -265,6 +202,7 @@ def train(cfg: TrainConfig) -> None:
             action_tokenizer,
             metrics,
             save_interval=cfg.save_interval,
+            validate_cfg=cfg.test,
         )
         # Finalize
         overwatch.info("Done with Training =>> Finalizing Metrics")

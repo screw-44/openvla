@@ -31,7 +31,7 @@ PRETRAINED_CKPT="/inspire/ssd/project/robot-decision/hexinyu-253108100063/openvl
 RESUME_STEP=200
 RESUME_EPOCH=50
 
-torchrun --standalone --nnodes 1 --nproc-per-node 4 vla-scripts/train.py \
+torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/train.py \
   --vla.type "siglip-224px+custom-trajectory" \
   --data_root_dir "${DATA_ROOT_DIR}" \
   --run_root_dir "${RUN_ROOT_DIR}" \
@@ -39,6 +39,7 @@ torchrun --standalone --nnodes 1 --nproc-per-node 4 vla-scripts/train.py \
   --save_interval "${SAVE_INTERVAL}" \
   --wandb_project "${WANDB_PROJECT}" \
   --wandb_entity "${WANDB_ENTITY}" \
+  --test.type=test-only \
   # --is_resume "${IS_RESUME}" \
   # --resume_step "${RESUME_STEP}" \
   # --resume_epoch "${RESUME_EPOCH}" \
@@ -51,3 +52,8 @@ torchrun --standalone --nnodes 1 --nproc-per-node 4 vla-scripts/train.py \
 
 # load的路径不对 （问题1）
 # 所以loss特别高（开始训练的时候）
+
+
+# test设置
+# python vla-scripts/train.py --test.type=test-only --test.test_save_dir="./my_test_results"
+

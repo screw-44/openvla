@@ -18,6 +18,7 @@ from torch.utils.data import DataLoader, Dataset, DistributedSampler, IterableDa
 from tqdm import tqdm
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
+from prismatic.conf.run import BaseStrategyConfig
 from prismatic.models.vlms import PrismaticVLM
 from prismatic.overwatch import initialize_overwatch
 from prismatic.training.metrics import Metrics, VLAMetrics
@@ -250,6 +251,7 @@ class TrainingStrategy(ABC):
         metrics: VLAMetrics,
         save_interval: int = 2500,
         save_full_model: bool = True,
+        validate_cfg: Optional[BaseStrategyConfig] = None,
     ) -> None:
         """Run the VLA training loop for the given `dataset` and `collator`; log losses, action metrics to `metrics`."""
         assert isinstance(vla_dataset, IterableDataset), "VLA training expects an IterableDataset!"
@@ -381,6 +383,18 @@ class TrainingStrategy(ABC):
                 metrics.commit(global_step=metrics.global_step + 1, epoch=epoch, lr=self.lr_scheduler.get_last_lr()[0])
                 status = metrics.push()
 
+                # Do Validation if specified
+                if validate_cfg is not None and validate_cfg.is_validate:
+                    if metrics.global_step % validate_cfg.validate_interval == 0:
+                        overwatch.info(f"Running Validation at Step {metrics.global_step}...")
+                        self.run_vla_testing(
+                            vla_dataset, # TODO： 添加训练数据集/测试数据集/验证数据集的区分
+                            collator,
+                            action_tokenizer,
+                            test_cfg=validate_cfg,
+                        )
+                        overwatch.info("Done with Validation.")
+
                 # Check for Save Interval or Max Steps & Save Checkpoint
                 if (terminate := (self.max_steps is not None and metrics.global_step >= self.max_steps)) or (
                     (metrics.global_step % save_interval) == 0
@@ -404,17 +418,15 @@ class TrainingStrategy(ABC):
         vla_dataset: IterableDataset,
         collator: PaddedCollatorForActionPrediction,
         action_tokenizer: ActionTokenizer,
-        # 这里往下是测试的参数
-        test_save_dir: Path,  # 保存的json文件路径 / 保存可视化图片的路径
-        test_length: int = -1,  # 默认测试长度，测试全部的数据
+        test_cfg: BaseStrategyConfig,
     ) -> None:
         """Run the VLA training loop for the given `dataset` and `collator`; log losses, action metrics to `metrics`."""
         assert isinstance(vla_dataset, IterableDataset), "VLA training expects an IterableDataset!"
         import numpy as np
         from PIL import Image
         import cv2
-        from benchmark.visualization.visualization_utils import SE3Transform, visualize_trajectories_on_image
-        
+        from Aff_benchmark.utils.rotation import SE3Converter
+        from Aff_benchmark.visualization.aff_2d import draw_aff_on_image
         if not overwatch.is_rank_zero(): # 只需要在rank0上进行测试
             return
 
@@ -439,7 +451,7 @@ class TrainingStrategy(ABC):
         #      Slightly breaks default PyTorch semantics, which is why we adaptively compute `epoch` below.
         for i, batch in tqdm(enumerate(dataloader)):
             # 因为dataloader是无限循环的，所以需要手动控制测试长度（读取实际的数据集长度）
-            if i > len(vla_dataset) or (i >= test_length and test_length > 0):
+            if i > len(vla_dataset) or (i >= test_cfg.test_data_length and test_cfg.test_data_length > 0):
                 break
             
             # Note that we'll unpack batch (and let AMP/FSDP do its thing) in the VLM.forward() call
@@ -497,8 +509,8 @@ class TrainingStrategy(ABC):
             save_data_batch["aff_l1_loss"] = torch.nn.functional.l1_loss(continuous_actions_pred[1:], continuous_actions_gt[1:])
 
             # 如果开启保存目录，就进行可视化保存
-            if test_save_dir is not None:
-                vis_save_dir = test_save_dir / "visualizations"
+            if test_cfg.test_save_dir is not None:
+                vis_save_dir = test_cfg.test_save_dir / "visualizations"
                 vis_save_dir.mkdir(parents=True, exist_ok=True) # 
                 visual_img = batch["pixel_values"][0].cpu().numpy() # batch["pixel_values"].shape = [batchsize, 3, 224, 224]
                 # print(visual_img.min().item(), " ", visual_img.max().item())
@@ -514,40 +526,29 @@ class TrainingStrategy(ABC):
                      [0.0, 686.1210327148438, 362.3411560058594],
                      [0.0, 0.0, 1.0]]
                 )
-                trajectory_pred = SE3Transform.d9_to_se3(save_data_batch["aff_pred"])
-                pose_6d_pred = SE3Transform.d9_to_se3(save_data_batch["object_pose_pred"])
-                trajectory_gt = SE3Transform.d9_to_se3(save_data_batch["aff_gt"])
+                trajectory_pred = SE3Converter.d9_to_se3(save_data_batch["aff_pred"])
+                pose_6d_pred = SE3Converter.d9_to_se3(save_data_batch["object_pose_pred"])
+                trajectory_gt = SE3Converter.d9_to_se3(save_data_batch["aff_gt"])
                 # print("trajectory_gt shape:", trajectory_gt.shape)
-                pose_6d_gt = SE3Transform.d9_to_se3(save_data_batch["object_pose_gt"])
+                pose_6d_gt = SE3Converter.d9_to_se3(save_data_batch["object_pose_gt"])
                 # print("object pose shape:", pose_6d_gt.shape)
 
                 # 如果是object centircs,这里trajectory的key是object
                 trajectory_key = "object"
-                visualized_img_pred = visualize_trajectories_on_image(
+                visualized_img_pred = draw_aff_on_image(
                     image=visual_img,
-                    camera_intrinsic=camera_K,
-                    trajectories_dict={trajectory_key: trajectory_pred},
-                    object_pose_world=pose_6d_gt, # 使用gt的物体位姿作为参考
+                    object_pose=pose_6d_pred,
+                    trajectory=trajectory_pred,
+                    K=camera_K,
+                    object_gt_pose=pose_6d_gt, # 使用gt的物体位姿作为参考
                 )
-                visualized_img_pred = visualize_trajectories_on_image(
-                    image=visualized_img_pred,
-                    camera_intrinsic=camera_K,
-                    trajectories_dict={"world": np.expand_dims(pose_6d_pred, axis=0)},
-                    object_pose_world=pose_6d_gt,
-                    colors={"object": (255, 0, 0)},  # 用红色表示最终的物品点(花点)
-                )
-                visualized_img_gt = visualize_trajectories_on_image(
+
+                visualized_img_gt = draw_aff_on_image(
                     image=visual_img,
-                    camera_intrinsic=camera_K,
-                    trajectories_dict={trajectory_key: trajectory_gt},
-                    object_pose_world=pose_6d_gt,
-                )
-                visualized_img_gt = visualize_trajectories_on_image(
-                    image=visualized_img_gt,
-                    camera_intrinsic=camera_K,
-                    trajectories_dict={"world": np.expand_dims(pose_6d_gt, axis=0)},
-                    object_pose_world=pose_6d_gt,
-                    colors={"object": (255, 0, 0)},  # 用红色表示最终的物品点(代码很狗屎，需要重构)
+                    object_pose=pose_6d_gt,
+                    trajectory=trajectory_gt,
+                    K=camera_K,
+                    object_gt_pose=pose_6d_gt, # 使用gt的物体位姿作为参考
                 )
 
                 # === 左右拼接图像并添加文字标签 ===
