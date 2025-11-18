@@ -136,7 +136,6 @@ dmypy.json
 
 # Auth Tokens / Hidden Files
 .hf_token
-.wandb_api_key
 .*_token
 .*api_key
 
@@ -153,4 +152,3 @@ data/
 
 # Rollout videos and wandb logs
 rollouts/
-wandb/
