@@ -1,133 +1,95 @@
 """
 datasets.py
 
-Draccus Dataclass Definition for a DatasetConfig object, with various registered subclasses for each dataset variant
-and processing scheme. A given dataset variant (e.g., `llava-lightning`) configures the following attributes:
-    - Dataset Variant (Identifier) --> e.g., "llava-v15"
-    - Align Stage Dataset Components (annotations, images)
-    - Finetune Stage Dataset Components (annotations, images)
-    - Dataset Root Directory (Path)
+数据集配置 (Dataset Configuration) - 类似于 VLAConfig 和 ModeConfig 的设计模式
+
+定义了不同的数据集配置及其特定参数：
+- LiberoDataset: Libero 数据集
+- CustomTrajectoryDataset: 自定义轨迹数据集
+
+使用方式：
+    在 RunConfig 中作为嵌套字段:
+    dataset: DatasetConfig = field(default_factory=...)
+    
+    CLI 使用:
+    --dataset.type libero
+    --dataset.repo_id "HuggingFaceVLA/libero"
+    --dataset.task_ids [0,1,2]
 """
 
 from dataclasses import dataclass
 from enum import Enum, unique
 from pathlib import Path
-from typing import Tuple
+from typing import List, Optional, Union
 
 from draccus import ChoiceRegistry
 
 
 @dataclass
 class DatasetConfig(ChoiceRegistry):
-    # fmt: off
-    dataset_id: str                                 # Unique ID that fully specifies a dataset variant
+    """数据集配置基类"""
+    dataset_id: str                                             # 数据集唯一标识符
+    
+    # === Dataset Source ===
+    repo_id: Union[str, Path] = "HuggingFaceVLA/libero"        # HF Dataset repo ID 或本地路径
+    
+    # === Task Selection ===
+    task_ids: Optional[List[int]] = None                        # Task IDs to include (None = all tasks)
+    
+    # === Trajectory Compression ===
+    trajectory_compression: str = "bining"                      # Trajectory compression method
+    
+    def get_task_ids(self) -> List[int]:
+        """获取任务 ID 列表，如果未指定则返回默认值"""
+        if self.task_ids is None:
+            return [0]
+        return self.task_ids
 
-    # Dataset Components for each Stage in < align | finetune >
-    align_stage_components: Tuple[Path, Path]       # Path to annotation file and images directory for `align` stage
-    finetune_stage_components: Tuple[Path, Path]    # Path to annotation file and images directory for `finetune` stage
 
-    dataset_root_dir: Path                          # Path to dataset root directory; others paths are relative to root
-    # fmt: on
+# === 具体的数据集配置 ===
 
-
-# [Reproduction] LLaVa-v15 (exact dataset used in all public LLaVa-v15 models)
 @dataclass
-class LLaVa_V15_Config(DatasetConfig):
-    dataset_id: str = "llava-v15"
-
-    align_stage_components: Tuple[Path, Path] = (
-        Path("download/llava-laion-cc-sbu-558k/chat.json"),
-        Path("download/llava-laion-cc-sbu-558k/"),
-    )
-    finetune_stage_components: Tuple[Path, Path] = (
-        Path("download/llava-v1.5-instruct/llava_v1_5_mix665k.json"),
-        Path("download/llava-v1.5-instruct/"),
-    )
-    dataset_root_dir: Path = Path("/mnt/fsx/skaramcheti/datasets/prismatic-vlms")
+class LiberoDataset(DatasetConfig):
+    """Libero 数据集配置"""
+    dataset_id: str = "libero"
+    repo_id: Union[str, Path] = "HuggingFaceVLA/libero"
+    task_ids: Optional[List[int]] = None
+    trajectory_compression: str = "bining"
 
 
-# [Multimodal-Only] LLava-v15 WITHOUT the Language-Only ShareGPT Data (No Co-Training)
 @dataclass
-class LLaVa_Multimodal_Only_Config(DatasetConfig):
-    dataset_id: str = "llava-multimodal"
-
-    align_stage_components: Tuple[Path, Path] = (
-        Path("download/llava-laion-cc-sbu-558k/chat.json"),
-        Path("download/llava-laion-cc-sbu-558k/"),
-    )
-    finetune_stage_components: Tuple[Path, Path] = (
-        Path("download/llava-v1.5-instruct/llava_v1_5_stripped625k.json"),
-        Path("download/llava-v1.5-instruct/"),
-    )
-    dataset_root_dir: Path = Path("/mnt/fsx/skaramcheti/datasets/prismatic-vlms")
+class CustomTrajectoryDataset(DatasetConfig):
+    """自定义轨迹数据集配置 - 用于手-物体交互等任务"""
+    dataset_id: str = "custom_trajectory"
+    repo_id: Union[str, Path] = "local/custom_trajectory"      # 默认本地路径
+    task_ids: Optional[List[int]] = None
+    trajectory_compression: str = "bining"
 
 
-# LLaVa-v15 + LVIS-Instruct-4V
 @dataclass
-class LLaVa_LVIS4V_Config(DatasetConfig):
-    dataset_id: str = "llava-lvis4v"
-
-    align_stage_components: Tuple[Path, Path] = (
-        Path("download/llava-laion-cc-sbu-558k/chat.json"),
-        Path("download/llava-laion-cc-sbu-558k/"),
-    )
-    finetune_stage_components: Tuple[Path, Path] = (
-        Path("download/llava-v1.5-instruct/llava_v1_5_lvis4v_mix888k.json"),
-        Path("download/llava-v1.5-instruct/"),
-    )
-    dataset_root_dir: Path = Path("/mnt/fsx/skaramcheti/datasets/prismatic-vlms")
+class BridgeDataset(DatasetConfig):
+    """Bridge 数据集配置"""
+    dataset_id: str = "bridge"
+    repo_id: Union[str, Path] = "HuggingFaceVLA/bridge"
+    task_ids: Optional[List[int]] = None
+    trajectory_compression: str = "bining"
 
 
-# LLaVa-v15 + LRV-Instruct
-@dataclass
-class LLaVa_LRV_Config(DatasetConfig):
-    dataset_id: str = "llava-lrv"
-
-    align_stage_components: Tuple[Path, Path] = (
-        Path("download/llava-laion-cc-sbu-558k/chat.json"),
-        Path("download/llava-laion-cc-sbu-558k/"),
-    )
-    finetune_stage_components: Tuple[Path, Path] = (
-        Path("download/llava-v1.5-instruct/llava_v1_5_lrv_mix1008k.json"),
-        Path("download/llava-v1.5-instruct/"),
-    )
-    dataset_root_dir: Path = Path("/mnt/fsx/skaramcheti/datasets/prismatic-vlms")
-
-
-# LLaVa-v15 + LVIS-Instruct-4V + LRV-Instruct
-@dataclass
-class LLaVa_LVIS4V_LRV_Config(DatasetConfig):
-    dataset_id: str = "llava-lvis4v-lrv"
-
-    align_stage_components: Tuple[Path, Path] = (
-        Path("download/llava-laion-cc-sbu-558k/chat.json"),
-        Path("download/llava-laion-cc-sbu-558k/"),
-    )
-    finetune_stage_components: Tuple[Path, Path] = (
-        Path("download/llava-v1.5-instruct/llava_v1_5_lvis4v_lrv_mix1231k.json"),
-        Path("download/llava-v1.5-instruct/"),
-    )
-    dataset_root_dir: Path = Path("/mnt/fsx/skaramcheti/datasets/prismatic-vlms")
-
-
-# === Define a Dataset Registry Enum for Reference & Validation =>> all *new* datasets must be added here! ===
+# === 数据集注册表 ===
 @unique
 class DatasetRegistry(Enum):
-    # === LLaVa v1.5 ===
-    LLAVA_V15 = LLaVa_V15_Config
-
-    LLAVA_MULTIMODAL_ONLY = LLaVa_Multimodal_Only_Config
-
-    LLAVA_LVIS4V = LLaVa_LVIS4V_Config
-    LLAVA_LRV = LLaVa_LRV_Config
-
-    LLAVA_LVIS4V_LRV = LLaVa_LVIS4V_LRV_Config
-
+    """数据集注册表 - 枚举所有可用的数据集配置"""
+    LIBERO = LiberoDataset
+    CUSTOM_TRAJECTORY = CustomTrajectoryDataset
+    BRIDGE = BridgeDataset
+    
     @property
     def dataset_id(self) -> str:
-        return self.value.dataset_id
+        return self.value().dataset_id
 
 
-# Register Datasets in Choice Registry
+
+# 注册所有数据集配置到 ChoiceRegistry
 for dataset_variant in DatasetRegistry:
     DatasetConfig.register_subclass(dataset_variant.dataset_id, dataset_variant.value)
+

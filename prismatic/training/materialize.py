@@ -10,7 +10,7 @@ from typing import Callable, Optional
 import torch
 
 from prismatic.models.vlms import PrismaticVLM
-from prismatic.training.strategies import FSDPStrategy, TrainingStrategy
+from prismatic.training.strategies import FSDPStrategy, RunStrategy
 
 # Registry =>> Maps ID --> {cls(), kwargs} :: supports FSDP for now, but DDP handler is also implemented!
 TRAIN_STRATEGIES = {
@@ -38,7 +38,7 @@ def get_train_strategy(
     reduce_in_full_precision: bool = False,
     mixed_precision_dtype: torch.dtype = torch.bfloat16,
     worker_init_fn: Optional[Callable[[int], None]] = None,
-) -> TrainingStrategy:
+) -> RunStrategy:
     if train_strategy in TRAIN_STRATEGIES:
         strategy_cfg = TRAIN_STRATEGIES[train_strategy]
         strategy = strategy_cfg["cls"](

@@ -5,7 +5,9 @@ import os
 
 import imageio
 import numpy as np
-import tensorflow as tf
+import torch
+import torchvision.transforms.functional as TF
+from PIL import Image
 from libero.libero import get_libero_path
 from libero.libero.envs import OffScreenRenderEnv
 
@@ -38,12 +40,23 @@ def resize_image(img, resize_size):
                     the same resizing scheme used in the Octo dataloader, which OpenVLA uses for training.
     """
     assert isinstance(resize_size, tuple)
-    # Resize to image size expected by model
-    img = tf.image.encode_jpeg(img)  # Encode as JPEG, as done in RLDS dataset builder
-    img = tf.io.decode_image(img, expand_animations=False, dtype=tf.uint8)  # Immediately decode back
-    img = tf.image.resize(img, resize_size, method="lanczos3", antialias=True)
-    img = tf.cast(tf.clip_by_value(tf.round(img), 0, 255), tf.uint8)
-    img = img.numpy()
+    
+    # Convert numpy array to PIL Image
+    pil_img = Image.fromarray(img.astype(np.uint8))
+    
+    # Encode as JPEG and decode back (to match RLDS dataset builder behavior)
+    import io
+    buffer = io.BytesIO()
+    pil_img.save(buffer, format='JPEG', quality=95)
+    buffer.seek(0)
+    pil_img = Image.open(buffer)
+    
+    # Resize using Lanczos (similar to lanczos3)
+    pil_img = pil_img.resize(resize_size, Image.Resampling.LANCZOS)
+    
+    # Convert back to numpy array
+    img = np.array(pil_img).astype(np.uint8)
+    
     return img
 
 

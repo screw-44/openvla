@@ -38,12 +38,12 @@ from transformers import AutoModelForVision2Seq, AutoProcessor, BitsAndBytesConf
 from transformers import AutoConfig, AutoImageProcessor
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
-import wandb
+import trackio as wandb
 from prismatic.models.backbones.llm.prompting import PurePromptBuilder, VicunaV15ChatPromptBuilder
 from prismatic.util.data_utils import PaddedCollatorForActionPrediction
 from prismatic.vla.action_tokenizer import ActionTokenizer
-from prismatic.vla.datasets import RLDSBatchTransform, RLDSDataset
-from prismatic.vla.datasets.rlds.utils.data_utils import save_dataset_statistics
+from prismatic.vla.datasets_old import RLDSBatchTransform, RLDSDataset
+from prismatic.vla.datasets_old.rlds.utils.data_utils import save_dataset_statistics
 
 from prismatic.extern.hf.configuration_prismatic import OpenVLAConfig
 from prismatic.extern.hf.modeling_prismatic import OpenVLAForActionPrediction

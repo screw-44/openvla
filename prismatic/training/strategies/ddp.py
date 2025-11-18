@@ -15,13 +15,13 @@ from torch.optim import AdamW
 from transformers.optimization import get_constant_schedule, get_cosine_schedule_with_warmup
 
 from prismatic.overwatch import initialize_overwatch
-from prismatic.training.strategies.base_strategy import TrainingStrategy
+from prismatic.training.strategies.base_strategy import RunStrategy
 
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
 
 
-class DDPStrategy(TrainingStrategy):
+class DDPStrategy(RunStrategy):
     @overwatch.rank_zero_only
     def save_checkpoint(
         self,

@@ -31,13 +31,13 @@ from transformers.optimization import get_constant_schedule, get_cosine_schedule
 
 from prismatic.models.vlms import PrismaticVLM
 from prismatic.overwatch import initialize_overwatch
-from prismatic.training.strategies.base_strategy import TrainingStrategy
+from prismatic.training.strategies.base_strategy import RunStrategy
 
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
 
 
-class FSDPStrategy(TrainingStrategy):
+class FSDPStrategy(RunStrategy):
     def __init__(
         self,
         vlm: PrismaticVLM,

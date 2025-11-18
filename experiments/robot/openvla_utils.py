@@ -5,8 +5,8 @@ import os
 import time
 
 import numpy as np
-import tensorflow as tf
 import torch
+import torchvision.transforms.functional as TF
 from PIL import Image
 from transformers import AutoConfig, AutoImageProcessor, AutoModelForVision2Seq, AutoProcessor
 
@@ -85,43 +85,50 @@ def crop_and_resize(image, crop_scale, batch_size):
     distribution shift at test time.
 
     Args:
-        image: TF Tensor of shape (batch_size, H, W, C) or (H, W, C) and datatype tf.float32 with
-               values between [0,1].
+        image: Torch Tensor of shape (batch_size, C, H, W) or (C, H, W) and datatype torch.float32 with
+               values between [0,1], or numpy array of shape (batch_size, H, W, C) or (H, W, C).
         crop_scale: The area of the center crop with respect to the original image.
         batch_size: Batch size.
     """
-    # Convert from 3D Tensor (H, W, C) to 4D Tensor (batch_size, H, W, C)
-    assert image.shape.ndims == 3 or image.shape.ndims == 4
-    expanded_dims = False
-    if image.shape.ndims == 3:
-        image = tf.expand_dims(image, axis=0)
-        expanded_dims = True
+    # Convert numpy to torch if needed
+    if isinstance(image, np.ndarray):
+        # Convert (H, W, C) or (B, H, W, C) to (C, H, W) or (B, C, H, W)
+        if image.ndim == 3:
+            image = torch.from_numpy(image).permute(2, 0, 1).unsqueeze(0).float() / 255.0
+            expanded_dims = True
+        else:
+            image = torch.from_numpy(image).permute(0, 3, 1, 2).float() / 255.0
+            expanded_dims = False
+    else:
+        # Assume already torch tensor
+        expanded_dims = False
+        if image.ndim == 3:
+            image = image.unsqueeze(0)
+            expanded_dims = True
 
     # Get height and width of crop
-    new_heights = tf.reshape(tf.clip_by_value(tf.sqrt(crop_scale), 0, 1), shape=(batch_size,))
-    new_widths = tf.reshape(tf.clip_by_value(tf.sqrt(crop_scale), 0, 1), shape=(batch_size,))
-
-    # Get bounding box representing crop
-    height_offsets = (1 - new_heights) / 2
-    width_offsets = (1 - new_widths) / 2
-    bounding_boxes = tf.stack(
-        [
-            height_offsets,
-            width_offsets,
-            height_offsets + new_heights,
-            width_offsets + new_widths,
-        ],
-        axis=1,
-    )
-
-    # Crop and then resize back up
-    image = tf.image.crop_and_resize(image, bounding_boxes, tf.range(batch_size), (224, 224))
-
-    # Convert back to 3D Tensor (H, W, C)
+    crop_size_ratio = torch.sqrt(torch.tensor(crop_scale)).clamp(0, 1).item()
+    
+    # Calculate crop size
+    _, _, h, w = image.shape
+    new_h = int(h * crop_size_ratio)
+    new_w = int(w * crop_size_ratio)
+    
+    # Center crop
+    top = (h - new_h) // 2
+    left = (w - new_w) // 2
+    
+    # Crop all images in batch
+    cropped = image[:, :, top:top+new_h, left:left+new_w]
+    
+    # Resize back to 224x224
+    resized = torch.nn.functional.interpolate(cropped, size=(224, 224), mode='bicubic', align_corners=False, antialias=True)
+    
+    # Convert back to original format if needed
     if expanded_dims:
-        image = image[0]
-
-    return image
+        resized = resized[0]
+    
+    return resized
 
 
 def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, center_crop=False):
@@ -136,22 +143,16 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, c
         batch_size = 1
         crop_scale = 0.9
 
-        # Convert to TF Tensor and record original data type (should be tf.uint8)
-        image = tf.convert_to_tensor(np.array(image))
-        orig_dtype = image.dtype
-
-        # Convert to data type tf.float32 and values between [0,1]
-        image = tf.image.convert_image_dtype(image, tf.float32)
-
-        # Crop and then resize back to original size
-        image = crop_and_resize(image, crop_scale, batch_size)
-
-        # Convert back to original data type
-        image = tf.clip_by_value(image, 0, 1)
-        image = tf.image.convert_image_dtype(image, orig_dtype, saturate=True)
-
+        # Convert PIL Image to torch tensor
+        image_np = np.array(image)  # Convert to numpy (H, W, C) uint8
+        
+        # Crop and resize (function handles conversion internally)
+        image_tensor = crop_and_resize(image_np, crop_scale, batch_size)
+        
         # Convert back to PIL Image
-        image = Image.fromarray(image.numpy())
+        # image_tensor is (C, H, W) with values in [0, 1]
+        image_np = (image_tensor.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+        image = Image.fromarray(image_np)
         image = image.convert("RGB")
 
     # Build VLA prompt

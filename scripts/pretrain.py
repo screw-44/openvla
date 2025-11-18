@@ -74,9 +74,9 @@ class PretrainConfig:
     hf_token: Union[str, Path] = Path(".hf_token")                  # Environment variable or Path to HF Token
 
     # Tracking Parameters
-    trackers: Tuple[str, ...] = ("jsonl", "wandb")                  # Trackers to initialize (if W&B, add config!)
-    wandb_project: str = "onyx-vlms"                                # Name of W&B project (default: `prismatic`)
-    wandb_entity: Optional[str] = "stanford-voltron"                # Name of W&B entity (default: None)
+    trackers: Tuple[str, ...] = ("wandb",)                          # Only use trackio (aliased as wandb)
+    wandb_project: str = "onyx-vlms"                                # Trackio project name
+    wandb_entity: Optional[str] = "stanford-voltron"                # Trackio entity name
 
     def __post_init__(self) -> None:
         """Set optimization parameters based on `stage` in {"align", "finetune"}."""

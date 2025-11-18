@@ -28,7 +28,7 @@ import numpy as np
 import tqdm
 from libero.libero import benchmark
 
-import wandb
+import trackio as wandb
 
 # Append current directory so that interpreter can find experiments.robot
 sys.path.append("../..")
