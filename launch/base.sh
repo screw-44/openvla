@@ -44,7 +44,7 @@ setup_paths() {
 # 通用配置
 # ============================================================================
 # VLA 模型类型
-export DEFAULT_VLA_TYPE="siglip-224px+custom-trajectory"
+export DEFAULT_VLA_TYPE="base"
 
 # 数据集配置
 export DEFAULT_DATASET_TYPE="libero"

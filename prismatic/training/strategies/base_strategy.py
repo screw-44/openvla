@@ -8,7 +8,6 @@ Training Strategies (DDP, FSDP-Grad, FSDP-Full) tend to have a lot of repeated c
 heavy lifting.
 """
 
-import trackio
 import numpy as np
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -412,30 +411,26 @@ class RunStrategy(ABC):
             avg_loss = torch.tensor(all_losses).mean().item()
             avg_accuracy = torch.tensor(all_action_accuracies).mean().item()
             
-            # Create prediction samples table
-            table_data = []
+            # Collect L1 errors for each sample
+            l1_errors = []
             for i in range(len(sample_predictions)):
-                pred_str = str(sample_predictions[i][:5]) + '...' if len(sample_predictions[i]) > 5 else str(sample_predictions[i])
-                gt_str = str(sample_gts[i][:5]) + '...' if len(sample_gts[i]) > 5 else str(sample_gts[i])
                 l1_error = float(np.abs(np.array(sample_predictions[i]) - np.array(sample_gts[i])).mean())
-                table_data.append([i, pred_str, gt_str, f"{l1_error:.4f}"])
+                l1_errors.append(l1_error)
             
-            prediction_table = trackio.Table(
-                columns=['Sample ID', 'Prediction', 'Ground Truth', 'L1 Error'],
-                data=table_data
+            # Use VLAMetrics to collect and log validation samples with table
+            # This ensures proper experiment isolation when running multiple instances
+            metrics.log_validation_samples(
+                predictions=sample_predictions,
+                ground_truths=sample_gts,
+                max_samples=len(sample_predictions),
+                dataset_name=None,  # Can specify dataset name for multi-dataset scenarios
             )
             
-            # Build validation metrics dict
-            validation_metrics = {
-                'VLA Validation/loss': avg_loss,
-                'VLA Validation/action_accuracy': avg_accuracy,
-                'VLA Validation/prediction_samples': prediction_table,
-            }
-            
-            # Log to trackio using VLAMetrics
-            metrics.log(
-                global_step=metrics.global_step,
-                metrics=validation_metrics
+            metrics.log_validation_table(
+                avg_loss=avg_loss,
+                avg_accuracy=avg_accuracy,
+                l1_errors=l1_errors,
+                dataset_name=None,
             )
             
             overwatch.info(f"✅ Validation metrics logged to trackio at step {metrics.global_step}")
@@ -443,78 +438,7 @@ class RunStrategy(ABC):
             overwatch.info(f"   - Action accuracy: {avg_accuracy:.4f}")
             overwatch.info(f"   - Logged {len(sample_predictions)} prediction samples")
 
-                #     # print(visual_img.min().item(), " ", visual_img.max().item())
-                #     # 调整通道顺序 (C, H, W) → (H, W, C)
-                #     visual_img = np.transpose(visual_img, (1, 2, 0))      # (224, 224, 3) (H, W, 3) 
-                #     visual_img = (visual_img + 1) / 2
-                #     visual_img = (visual_img * 255).astype(np.uint8)
-                #     # print(visual_img.min().item(), " ", visual_img.max().item())
-                #     visual_img = cv2.resize(visual_img, (1280, 720))
-                #     # 读取相机内参 ob camera
-                #     camera_K = np.array(
-                #         [[685.95849609375, 0.0, 644.1708984375],
-                #         [0.0, 686.1210327148438, 362.3411560058594],
-                #         [0.0, 0.0, 1.0]]
-                #     )
-                #     trajectory_pred = SE3Converter.d9_to_se3(save_data_batch["aff_pred"])
-                #     pose_6d_pred = SE3Converter.d9_to_se3(save_data_batch["object_pose_pred"])
-                #     trajectory_gt = SE3Converter.d9_to_se3(save_data_batch["aff_gt"])
-                #     # print("trajectory_gt shape:", trajectory_gt.shape)
-                #     pose_6d_gt = SE3Converter.d9_to_se3(save_data_batch["object_pose_gt"])
-                #     # print("object pose shape:", pose_6d_gt.shape)
-
-                #     # 如果是object centircs,这里trajectory的key是object
-                #     trajectory_key = "object"
-                #     visualized_img_pred = draw_aff_on_image(
-                #         image=visual_img,
-                #         object_pose=pose_6d_pred,
-                #         trajectory=trajectory_pred,
-                #         K=camera_K,
-                #         object_gt_pose=pose_6d_gt, # 使用gt的物体位姿作为参考
-                #     )
-
-                #     visualized_img_gt = draw_aff_on_image(
-                #         image=visual_img,
-                #         object_pose=pose_6d_gt,
-                #         trajectory=trajectory_gt,
-                #         K=camera_K,
-                #         object_gt_pose=pose_6d_gt, # 使用gt的物体位姿作为参考
-                #     )
-
-                #     # === 左右拼接图像并添加文字标签 ===
-                #     # 左右拼接图像
-                #     combined_img = np.hstack([visualized_img_pred, visualized_img_gt])
-                    
-                #     # 在图像顶部添加文字标签
-                #     font = cv2.FONT_HERSHEY_SIMPLEX
-                #     font_scale = 1.5
-                #     font_color = (255, 255, 255)  # 白色
-                #     font_thickness = 3
-                    
-                #     # 计算文字位置
-                #     text_pred = "PRED"
-                #     text_gt = "GT"
-                #     text_size_pred = cv2.getTextSize(text_pred, font, font_scale, font_thickness)[0]
-                #     text_size_gt = cv2.getTextSize(text_gt, font, font_scale, font_thickness)[0]
-                    
-                #     # 在左半部分（pred）顶部居中添加"PRED"
-                #     x_pred = (1280 - text_size_pred[0]) // 2
-                #     y_pred = 40  # 距离顶部40像素
-                #     cv2.putText(combined_img, text_pred, (x_pred, y_pred), font, font_scale, font_color, font_thickness)
-                    
-                #     # 在右半部分（gt）顶部居中添加"GT"
-                #     x_gt = 1280 + (1280 - text_size_gt[0]) // 2
-                #     y_gt = 40  # 距离顶部40像素
-                #     cv2.putText(combined_img, text_gt, (x_gt, y_gt), font, font_scale, font_color, font_thickness)
-
-                #     # # 保存原始单独图像
-                #     # cv2.imwrite(str(vis_save_dir / f"test_{total_batches_processed-1:05d}_pred.png"), visualized_img_pred)
-                #     # cv2.imwrite(str(vis_save_dir / f"test_{total_batches_processed-1:05d}_gt.png"), visualized_img_gt)
-                    
-                #     combined_img = cv2.resize(combined_img, None, fx=0.3, fy=0.3)  #压缩图像大小到接近到224的地方
-                #     # 保存拼接后的图像
-                #     cv2.imwrite(str(vis_save_dir / f"test_{total_batches_processed-1:05d}_combined.jpg"), combined_img)
-
+               
 
 
 

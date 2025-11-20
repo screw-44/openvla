@@ -5,11 +5,14 @@ Core class definition for a strategy implementing Torch native Fully Sharded Dat
 fine-grained control over wrapping policies and mixed precision per component).
 """
 
+import copy
 import math
+import threading
+import time
 from collections import OrderedDict
 from functools import partial
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import torch
 import torch.distributed as dist
@@ -35,6 +38,18 @@ from prismatic.training.strategies.base_strategy import RunStrategy
 
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
+
+
+def _deep_copy_to_cpu(obj: Any) -> Any:
+    """Recursively deep copy and move tensors to CPU to free GPU memory."""
+    if isinstance(obj, torch.Tensor):
+        return obj.detach().cpu()
+    elif isinstance(obj, dict):
+        return {k: _deep_copy_to_cpu(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return type(obj)(_deep_copy_to_cpu(item) for item in obj)
+    else:
+        return obj
 
 
 class FSDPStrategy(RunStrategy):
@@ -91,6 +106,39 @@ class FSDPStrategy(RunStrategy):
         assert state_dict_type == StateDictType.FULL_STATE_DICT, "Sharded state saving is not yet implemented!"
         self.fsdp_state_dict_type = state_dict_type
         self.fsdp_save_policy = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
+        
+        # Async checkpoint save state
+        self.async_save_thread = None
+        self.checkpoint_save_error = None
+
+    @staticmethod
+    def _move_tensors_to_device(obj, device: str):
+        """Recursively move all tensors in a nested dict/list structure to specified device."""
+        if isinstance(obj, torch.Tensor):
+            return obj.to(device)
+        elif isinstance(obj, dict):
+            return {k: FSDPStrategy._move_tensors_to_device(v, device) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return type(obj)(FSDPStrategy._move_tensors_to_device(item, device) for item in obj)
+        else:
+            return obj
+
+    @staticmethod
+    def _async_save_worker(
+        state_dict_copy: dict,
+        checkpoint_path: Path,
+        latest_checkpoint_path: Path,
+    ) -> None:
+        """Background worker thread for saving FSDP checkpoints asynchronously."""
+        try:
+            import shutil
+            # Save checkpoint to disk
+            torch.save({"model": state_dict_copy}, checkpoint_path)
+            # Copy to latest checkpoint
+            shutil.copy(checkpoint_path, latest_checkpoint_path)
+        except Exception as e:
+            overwatch.error(f"Error during async checkpoint save: {e}")
+            raise
 
     def save_checkpoint(
         self,
@@ -100,10 +148,25 @@ class FSDPStrategy(RunStrategy):
         train_loss: Optional[float] = None,
         only_trainable: bool = True,
     ) -> None:
-        """Save a checkpoint to the `run_dir` only containing the state_dicts for trainable parameters by default."""
+        """
+        Save an FSDP checkpoint asynchronously to the `run_dir` with GPU memory optimization.
+        
+        Stage 1: Reconstruct full state_dict from FSDP shards (must be synchronous - AllGather)
+        Stage 2: Copy + detach to CPU (GPU weights untouched, background save ready)
+        Stage 3: Start async disk write in background thread (only rank 0)
+        """
         assert isinstance(self.vlm, FSDP), "FSDPStrategy.save_checkpoint assumes VLM is already wrapped in FSDP!"
 
-        # Summon Full State Dictionary =>> Reconstitute from Shards
+        # Wait for any previous async save to complete
+        if self.async_save_thread is not None and self.async_save_thread.is_alive():
+            overwatch.info(f"Waiting for previous checkpoint save to complete...")
+            self.async_save_thread.join()
+            if self.checkpoint_save_error is not None:
+                raise RuntimeError(f"Previous checkpoint save failed: {self.checkpoint_save_error}")
+
+        # Stage 1: Reconstruct full state_dict from FSDP shards (must be synchronous)
+        # This is the bottleneck, but unavoidable - all ranks must participate in AllGather
+        reconstruction_start = time.time()
         with FSDP.state_dict_type(self.vlm, self.fsdp_state_dict_type, self.fsdp_save_policy):
             full_vlm_state_dict = self.vlm.state_dict()
             model_state_dicts = {
@@ -115,26 +178,62 @@ class FSDPStrategy(RunStrategy):
                 for mkey in model_state_dicts:
                     if key.startswith(mprefix := f"{mkey}."):
                         model_state_dicts[mkey][key.removeprefix(mprefix)] = param
+        
+        reconstruction_time = time.time() - reconstruction_start
 
-            # Save on rank zero *only*
-            if overwatch.is_rank_zero():
-                checkpoint_dir = run_dir / "checkpoints"
-                if train_loss is None:
-                    checkpoint_path = checkpoint_dir / f"step-{global_step:06d}-epoch-{epoch:02d}-loss=inf.pt"
+        # Only proceed with save on rank zero
+        if overwatch.is_rank_zero():
+            # Stage 2: Copy + detach to CPU (GPU weights remain on GPU, ready for next batch)
+            copy_to_cpu_start = time.time()
+            
+            def _copy_to_cpu(obj):
+                """Recursively copy and detach tensors to CPU."""
+                if isinstance(obj, torch.Tensor):
+                    return obj.detach().clone().cpu()
+                elif isinstance(obj, dict):
+                    return {k: _copy_to_cpu(v) for k, v in obj.items()}
+                elif isinstance(obj, OrderedDict):
+                    return OrderedDict((k, _copy_to_cpu(v)) for k, v in obj.items())
+                elif isinstance(obj, (list, tuple)):
+                    return type(obj)(_copy_to_cpu(item) for item in obj)
                 else:
-                    checkpoint_path = (
-                        checkpoint_dir / f"step-{global_step:06d}-epoch-{epoch:02d}-loss={train_loss:.4f}.pt"
-                    )
+                    return obj
+            
+            model_state_dicts_copy = _copy_to_cpu(model_state_dicts)
+            stage2_time = time.time() - copy_to_cpu_start
 
-                # Save Checkpoint & Copy Latest to `latest-checkpoint.pt`
-                torch.save({"model": model_state_dicts}, checkpoint_path)
+            # Set Checkpoint Path
+            checkpoint_dir = run_dir / "checkpoints"
+            checkpoint_dir.mkdir(parents=True, exist_ok=True)
+            
+            if train_loss is None:
+                checkpoint_path = checkpoint_dir / f"step-{global_step:06d}-epoch-{epoch:02d}-loss=inf.pt"
+            else:
+                checkpoint_path = checkpoint_dir / f"step-{global_step:06d}-epoch-{epoch:02d}-loss={train_loss:.4f}.pt"
 
-                # TODO (siddk) :: This breaks w/ Sagemaker default permissions (root vs. <user>)... skip?
-                # shutil.copy(checkpoint_path, checkpoint_dir / "latest-checkpoint.pt")
+            latest_checkpoint_path = checkpoint_dir / "latest-checkpoint.pt"
+
+            # Stage 3: Start async save thread (disk I/O happens in background)
+            self.async_save_thread = threading.Thread(
+                target=self._async_save_worker,
+                args=(model_state_dicts_copy, checkpoint_path, latest_checkpoint_path),
+                daemon=False,
+            )
+            self.async_save_thread.start()
+
+            overwatch.info(
+                f"✅ FSDP checkpoint save started (async) at step {global_step}\n"
+                f"         Stage 1 [Reconstruct from shards]:  {reconstruction_time:.3f}s\n"
+                f"         Stage 2 [Copy+detach→CPU]:          {stage2_time:.3f}s (GPU weights untouched)\n"
+                f"         Stage 3 [Async disk write]:         In background...\n"
+                f"         |-> Total setup time: {reconstruction_time + stage2_time:.3f}s\n"
+                f"         |-> Checkpoint: {checkpoint_path.name}"
+            )
 
     def run_setup(self, run_dir: Path, n_train_examples: int) -> None:
         # Iteratively Assemble FSDP Wrapping Policy by fetching the wrapping policies for each backbone/constituent
         vlm_fsdp_wrapping_policy = self.vlm.get_fsdp_wrapping_policy()
+
 
         # Assemble the Default FSDP Mixed Precision Policy
         if self.enable_mixed_precision_training and self.mixed_precision_dtype == torch.bfloat16:

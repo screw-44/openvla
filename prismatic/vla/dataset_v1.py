@@ -108,14 +108,20 @@ class MyLeRobotDataset(torch.utils.data.Dataset):
     
     def get_trajectory_for_item(self, item):
         episode_id, frame_id = item['episode_index'].item(), item['frame_index'].item() # tensor转换成int
-    
-        # 注意是dataset的meta，而不是空的metadata
+        
         episode_from_id, episode_to_id = self.dataset.meta.episodes['dataset_from_index'][episode_id], self.dataset.meta.episodes['dataset_to_index'][episode_id]
-        original_trajectory = np.array(self.dataset.hf_dataset['action'][episode_from_id+frame_id:episode_to_id])
-        compressed_trajectory = self.trajectory_compression(original_trajectory)
+        # 注意是dataset的meta，而不是空的metadata
+        # 最基础的情况， 没有定义exp_type
+        if not hasattr(self.trajectory_compression, "exp_type"):
+            original_trajectory = np.array(self.dataset.hf_dataset['action'][episode_from_id+frame_id:episode_to_id])
+            compressed_trajectory = self.trajectory_compression(original_trajectory)
+        elif self.trajectory_compression.exp_type == "fix_freq":
+            complete_trajectory = np.array(self.dataset.hf_dataset['action'][episode_from_id:episode_to_id])
+            compressed_trajectory = self.trajectory_compression(complete_trajectory, frame_id / (episode_to_id - episode_from_id))
+        
         return torch.Tensor(compressed_trajectory)
 
-    def __len__(self):      
+    def __len__(self): 
         return len(self.dataset)
     
     def __getitem__(self, index):

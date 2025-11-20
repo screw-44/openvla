@@ -15,7 +15,7 @@ init_base_config
 # ============================================================================
 # 实验特定配置
 # ============================================================================
-EXPERIMENT_NAME="aff_representation_251117"
+EXPERIMENT_NAME="aff_rep_251120"
 RUN_ID_NOTE="${EXPERIMENT_NAME}"
 
 # 模型配置
@@ -40,46 +40,14 @@ MAX_STEPS="${MAX_STEPS:-}"  # 留空使用 epochs
 # 项目配置
 PROJECT="vla-affordance-experiment"
 
-# ============================================================================
-# 实验说明
-# ============================================================================
-echo "============================================"
-echo "实验: Affordance 和表征方式对比"
-echo "============================================"
-echo "实验名称: ${EXPERIMENT_NAME}"
-echo "日期: 2025-11-17"
-echo ""
-echo "实验配置:"
-echo "  - VLA Type: ${VLA_TYPE}"
-echo "  - Dataset: ${DATASET_TYPE}"
-echo "  - Save Interval: ${SAVE_INTERVAL}"
-echo "  - Validate Interval: ${VALIDATE_INTERVAL}"
-echo "  - Validation Batches: ${NUM_VALIDATION_BATCHES}"
-echo ""
-echo "实验目标:"
-echo "  1. 测试不同的 trajectory compression 方法"
-echo "  2. 对比各种压缩方法对模型性能的影响"
-echo "  3. 分析最优的 affordance 表征策略"
-echo ""
-echo "将测试的 compression 方法:"
-echo "  - none (无压缩, 基线)"
-echo "  - bining (分箱压缩)"
-echo "  - quantization (量化压缩)"
-echo "  - spatial (空间压缩)"
-echo "  - temporal (时间压缩)"
-echo "============================================"
-
-# ============================================================================
 # 启动训练 - 测试不同的 trajectory_compression 方法
 # ============================================================================
 cd "${PROJECT_ROOT}"
 
 # 定义要测试的所有 trajectory_compression 方法
 COMPRESSION_METHODS=(
-    "action_chunk"           # 不压缩（基线）
-    # "bining"         # 分箱压缩
-    # "uniform_bspline"   # 量化压缩
-    # "adaptive_bspline"        # 空间压缩
+    "fix_freq_bining"
+    "fix_freq_uniform_bspline"
 )
 
 echo "============================================"
@@ -123,7 +91,11 @@ for COMPRESSION_METHOD in "${COMPRESSION_METHODS[@]}"; do
       --run_id_note \"${CURRENT_RUN_ID}\" \
       --save_interval \"${SAVE_INTERVAL}\" \
       --epochs ${EPOCHS} \
-      --project \"${PROJECT}\""
+      --project \"${PROJECT}\" \
+      "
+
+      #\
+      # --vla.per_device_batch_size 1
     
     # 如果设置了 MAX_STEPS，添加该参数
     if [ -n "${MAX_STEPS}" ]; then

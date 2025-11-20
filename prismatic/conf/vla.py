@@ -14,6 +14,7 @@ from enum import Enum, unique
 from pathlib import Path
 from typing import Optional, Union
 
+import torch
 from draccus import ChoiceRegistry
 
 
@@ -50,6 +51,17 @@ class VLAConfig(ChoiceRegistry):
     reduce_in_full_precision: bool = True           # Accumulate/Reduce All-Gather Gradients in FP32 Full Precision
 
     # fmt: on
+
+    def __post_init__(self) -> None:
+        """
+        Post-initialization hook to compute global_batch_size if it's set to -1 (auto-compute mode).
+        For VLA training, global_batch_size must equal per_device_batch_size * number_of_gpus
+        to ensure grad_accumulation_steps == 1.
+        """
+        if self.global_batch_size == -1:
+            # Auto-compute global_batch_size based on per_device_batch_size and available GPUs
+            num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 1
+            self.global_batch_size = self.per_device_batch_size * num_gpus
 
 
 # === OpenVLA Training Configurations ===
@@ -131,20 +143,22 @@ class Exp_DinoSigLIP_224px_OXE_Magic_Soup_Plus(Exp_SigLIP_224px_Bridge):
 
 # === [1 GPU] Lightweight Custom Trajectory Training ===
 @dataclass
-class Exp_SigLIP_224px_Custom_Trajectory(VLAConfig):
-    vla_id: str = "siglip-224px+custom-trajectory"
+class Base(VLAConfig):
+    vla_id: str = "base"
     base_vlm: Union[str, Path] = "TRI-ML/prismatic-vlms/siglip-224px+7b"
 
-    freeze_vision_backbone: bool = False
-    freeze_llm_backbone: bool = False  
-    unfreeze_last_llm_layer: bool = False
+    freeze_vision_backbone: bool = True
+    freeze_llm_backbone: bool = True  
+    unfreeze_last_llm_layer: bool = True
 
     shuffle_buffer_size: int = 256_000 # Smaller buffer for lightweight training
 
     # Optimization Parameters - optimized for single GPU (epochs and max_steps now in RunConfig)
     # H100 Settings
-    global_batch_size: int = 128  
+    # Note: global_batch_size = -1 means auto-compute: per_device_batch_size * number_of_gpus
+    global_batch_size: int = -1  # Auto-computed in __post_init__
     per_device_batch_size: int = 32
+
 
     learning_rate: float = 5e-5   # Slightly higher LR for faster convergence
     weight_decay: float = 0.01    # Add some regularization
@@ -175,7 +189,7 @@ class VLARegistry(Enum):
     DINOSIGLIP_224PX_MX_OXE_MAGIC_SOUP_PLUS = Exp_DinoSigLIP_224px_OXE_Magic_Soup_Plus
 
     # === Custom Trajectory Training ===
-    SIGLIP_224PX_CUSTOM_TRAJECTORY = Exp_SigLIP_224px_Custom_Trajectory
+    Base = Base
 
     @property
     def vla_id(self) -> str:

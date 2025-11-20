@@ -144,4 +144,6 @@ class PureOverwatch:
 
 
 def initialize_overwatch(name: str) -> Union[DistributedOverwatch, PureOverwatch]:
-    return DistributedOverwatch(name) if int(os.environ.get("WORLD_SIZE", -1)) != -1 else PureOverwatch(name)
+    return DistributedOverwatch(name) 
+
+ # 永远采用分布的方式，哪怕只有一张卡（反正兼容） if int(os.environ.get("WORLD_SIZE", -1)) != -1 else PureOverwatch(name)

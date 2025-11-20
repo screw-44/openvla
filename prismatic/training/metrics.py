@@ -106,8 +106,141 @@ class VLAMetrics:
             }
         self.dataset_trackers = defaultdict(create_dataset_tracker)
 
+        # Validation table buffer for collecting and storing validation samples
+        # Structure: {
+        #     'predictions': List[np.ndarray],
+        #     'ground_truths': List[np.ndarray],
+        #     'dataset_name': Optional[str],
+        #     'num_samples': int,
+        # }
+        self.validation_table_buffer = {}
+
     def log(self, global_step: int, metrics: Dict[str, Union[int, float]]) -> None:
         self.tracker.write(global_step, metrics)
+
+    @overwatch.rank_zero_only
+    def log_validation_samples(
+        self,
+        predictions: list,
+        ground_truths: list,
+        max_samples: int = 4,
+        dataset_name: Optional[str] = None,
+    ) -> None:
+        """
+        Collect validation samples to buffer for later table generation.
+        
+        Args:
+            predictions: List of predicted trajectories (np.ndarray or list format)
+            ground_truths: List of ground truth trajectories (np.ndarray or list format)
+            max_samples: Maximum number of samples to store (default: 4)
+            dataset_name: Optional dataset identifier for organizing samples by dataset
+        """
+        if len(predictions) == 0 or len(ground_truths) == 0:
+            return
+        
+        # Limit number of samples to store
+        num_samples = min(len(predictions), len(ground_truths), max_samples)
+        
+        self.validation_table_buffer = {
+            'predictions': predictions[:num_samples],
+            'ground_truths': ground_truths[:num_samples],
+            'dataset_name': dataset_name,
+            'num_samples': num_samples,
+        }
+
+    @overwatch.rank_zero_only
+    def log_validation_table(
+        self,
+        avg_loss: float,
+        avg_accuracy: float,
+        l1_errors: Optional[list] = None,
+        dataset_name: Optional[str] = None,
+    ) -> None:
+        """
+        Generate validation prediction table and log to trackio.
+        
+        This method:
+        1. Retrieves samples from validation_table_buffer
+        2. Creates a trackio.Table object with prediction vs ground truth data
+        3. Logs metrics and table with unique keys to ensure proper experiment isolation
+        4. Cleans up the buffer
+        
+        Args:
+            avg_loss: Average validation loss
+            avg_accuracy: Average action accuracy
+            l1_errors: List of L1 errors for each sample (optional, will be computed if not provided)
+            dataset_name: Optional dataset name for multi-dataset validation scenarios
+        """
+        if not self.validation_table_buffer:
+            overwatch.warning("No validation samples in buffer. Skipping table generation.")
+            return
+        
+        import trackio as wandb
+        
+        # Retrieve data from buffer
+        preds = self.validation_table_buffer['predictions']
+        gts = self.validation_table_buffer['ground_truths']
+        num_samples = self.validation_table_buffer['num_samples']
+        buffer_dataset_name = self.validation_table_buffer.get('dataset_name')
+        
+        # Use provided dataset_name if available, otherwise use buffer's dataset_name
+        effective_dataset_name = dataset_name or buffer_dataset_name
+        
+        # Construct table data
+        table_data = []
+        for i in range(num_samples):
+            # Convert predictions to string representation
+            if isinstance(preds[i], np.ndarray):
+                pred_array = preds[i]
+            else:
+                pred_array = np.array(preds[i])
+            
+            if isinstance(gts[i], np.ndarray):
+                gt_array = gts[i]
+            else:
+                gt_array = np.array(gts[i])
+            
+            # Truncate long arrays for display
+            pred_str = str(pred_array[:5]) + '...' if len(pred_array) > 5 else str(pred_array)
+            gt_str = str(gt_array[:5]) + '...' if len(gt_array) > 5 else str(gt_array)
+            
+            # Compute L1 error if not provided
+            if l1_errors is not None and i < len(l1_errors):
+                l1_error = l1_errors[i]
+            else:
+                l1_error = float(np.mean(np.abs(pred_array - gt_array)))
+            
+            table_data.append({
+                'Sample ID': str(i),
+                'Prediction': pred_str,
+                'Ground Truth': gt_str,
+                'L1 Error': f"{l1_error:.4f}"
+            })
+        
+        # Create trackio Table object
+        prediction_table = wandb.Table(
+            columns=['Sample ID', 'Prediction', 'Ground Truth', 'L1 Error'],
+            data=table_data
+        )
+        
+        # Build unique table key with dataset name for multi-dataset scenarios
+        # This ensures tables from different datasets don't collide
+        ds_suffix = f"_{effective_dataset_name}" if effective_dataset_name else ""
+        table_key = f"VLA Validation/prediction_samples{ds_suffix}"
+        
+        # Log validation metrics and table to trackio
+        # Note: Each VLAMetrics instance has its own tracker with unique run_id,
+        # so multiple experiments automatically get isolated in trackio
+        validation_metrics = {
+            table_key: prediction_table,
+            f"VLA Validation/loss{ds_suffix}": avg_loss,
+            f"VLA Validation/accuracy{ds_suffix}": avg_accuracy,
+        }
+        
+        self.log(self.global_step, validation_metrics)
+        
+        # Clean up buffer after logging
+        self.validation_table_buffer = {}
 
     def get_status(self, loss: Optional[torch.Tensor] = None) -> str:
         lr = self.state["lr"][-1] if len(self.state["lr"]) > 0 else 0

@@ -37,6 +37,12 @@ from prismatic.vla import get_vla_dataset_and_collator
 # Sane Defaults
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+# --- 分布式训练奇怪的设定 ---
+# 强制根据 Local Rank 设置当前进程可见的 GPU
+local_rank = int(os.environ.get("LOCAL_RANK", 0))
+torch.cuda.set_device(local_rank)
+
+
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
 
@@ -130,7 +136,7 @@ class RunConfig:
     )
     # === VLA Model Configuration（嵌套 ChoiceRegistry）===
     vla: VLAConfig = field(
-        default_factory=VLAConfig.get_choice_class(VLARegistry.SIGLIP_224PX_CUSTOM_TRAJECTORY.vla_id)
+        default_factory=VLAConfig.get_choice_class(VLARegistry.Base.vla_id)
     )
     # === Dataset Configuration（嵌套 ChoiceRegistry）===
     dataset: DatasetConfig = field(

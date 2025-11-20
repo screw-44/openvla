@@ -26,9 +26,12 @@ EPOCHS="${EPOCHS:-${DEFAULT_EPOCHS}}"
 MAX_STEPS="${MAX_STEPS:-10}"
 
 # 验证配置
-VALIDATE_INTERVAL="${VALIDATE_INTERVAL:-50}"           # 每N步验证一次
-NUM_VALIDATION_BATCHES="${NUM_VALIDATION_BATCHES:-30}" # 每次验证使用的批次数
+VALIDATE_INTERVAL="${VALIDATE_INTERVAL:-13}"           # 每N步验证一次
+NUM_VALIDATION_BATCHES="${NUM_VALIDATION_BATCHES:-10}" # 每次验证使用的批次数
 VALIDATE_SAVE_DIR="${VALIDATE_SAVE_DIR:-runs/validation}" # 验证结果保存路径
+
+# 保存频率
+SAVE_INTERVAL=5 # 每N个epoch保存一次模型
 
 # ============================================================================
 # 启动训练+验证
