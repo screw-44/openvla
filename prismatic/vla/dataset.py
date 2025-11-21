@@ -112,7 +112,8 @@ class MyLeRobotDataset(torch.utils.data.Dataset):
         episode_from_id, episode_to_id = self.dataset.meta.episodes['dataset_from_index'][episode_id], self.dataset.meta.episodes['dataset_to_index'][episode_id]
         # 注意是dataset的meta，而不是空的metadata
         # 最基础的情况， 没有定义exp_type
-        if not hasattr(self.trajectory_compression, "exp_type"):
+        if not hasattr(self.trajectory_compression, "exp_type") or \
+                self.trajectory_compression.exp_type == "positional":
             original_trajectory = np.array(self.dataset.hf_dataset['action'][episode_from_id+frame_id:episode_to_id])
             compressed_trajectory = self.trajectory_compression(original_trajectory)
         elif self.trajectory_compression.exp_type == "fix_freq":

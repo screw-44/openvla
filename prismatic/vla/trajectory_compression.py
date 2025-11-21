@@ -71,6 +71,135 @@ class BiningTrajectoryCompression(BaseTrajectoryCompression):
         compressed_trajectory = np.array([trajectory[int(idx)] for idx in indices])
         return compressed_trajectory
 
+# 拟合方法，加权最小二乘, s这个参数代表是否平滑拟合
+# scipy.interpolate.splrep(x, y, s=0, k=3) 名称：Spline representation, 输出：三元组 (t(knots), c(control), k)
+# scipy.interpolate.splev(x_new, tck)  名称：Spline evaluation （这两个只是插值）
+# scipy.interpolate.make_lsq_spline(x, y, t, k) 名称：Least-squares B-spline representation（真正的拟合函数）
+@register_trajectory_compression("uniform_bspline")
+class UniformBSplineTrajectoryCompression(BaseTrajectoryCompression):
+    def __init__(self, target_length: int = 20, degree: int = 3):
+        """
+        固定点数的B样条压缩：用固定数量的内部节点来拟合B样条，通过最小二乘法优化控制点。
+        采用时间参数化，控制点均匀分布在轨迹上。（模型不需要预测x轴）
+        Args:
+            target_length: 内部节点数量（控制点数量 = target_length + degree + 1）
+            degree: B样条的阶数（默认3 = 三次样条）
+        """
+        self.target_length = target_length
+        self.degree = degree
+
+    def __call__(self, trajectory: np.ndarray) -> np.ndarray:
+        """
+        使用固定数量的内部节点进行B样条最小二乘拟合。
+        
+        工作流程：
+        1. 在整条轨迹上均匀分布 target_length 个内部节点
+        2. 使用 make_lsq_spline 拟合B样条（自动优化控制点的y值）
+        3. 返回优化得到的控制点（不在原始曲线上）
+        
+        Args:
+            trajectory: [points_num, dim] 的numpy数组
+        
+        Returns:
+            control_points: [n_control_points, dim] 的numpy数组，n = target_length + degree + 1
+            interior_knots: [target_length] 内部节点位置
+        """
+
+        original_length = trajectory.shape[0]
+        dim = trajectory.shape[1] if len(trajectory.shape) > 1 else 1
+
+        # B样条约束：数据点数量必须 >= 控制点数量
+        # 控制点数量 = n_interior_knots + degree + 1
+        n_control_points = self.target_length + self.degree + 1
+        
+        # 如果原始长度不足控制点数量，先填充
+        if original_length < n_control_points:
+            # 重复最后一个点来填充
+            last_point = trajectory[-1:]
+            num_padding = n_control_points - original_length
+            padding = np.repeat(last_point, num_padding, axis=0)
+            trajectory = np.vstack([trajectory, padding])
+            original_length = trajectory.shape[0]  # 更新长度
+        
+        # 时间参数化
+        x_data = np.arange(original_length, dtype=float)
+        x_min, x_max = 0.0, float(original_length - 1)
+        
+        # 在轨迹上均匀分布内部节点（排除端点）
+        # 因为是时间上均匀分布，interior_knots为均匀分布的时间点。
+        interior_knots = np.linspace(x_min, x_max, self.target_length + 2)[1:-1]
+        
+        # 构造完整的knot vector
+        knot_vector = np.concatenate([
+            np.repeat(x_min, self.degree + 1),      # 起始重复节点
+            interior_knots,                          # 内部节点
+            np.repeat(x_max, self.degree + 1)       # 结束重复节点
+        ])
+        
+        # 对每个维度分别进行B样条最小二乘拟合
+        all_control_points = []
+        
+        for d in range(dim):
+            # 使用最小二乘法拟合B样条
+            # make_lsq_spline 会自动计算最优的控制点
+            bspline = make_lsq_spline(x_data, trajectory[:, d], knot_vector, k=self.degree)
+            all_control_points.append(bspline.c)
+        
+        # 将控制点组合成 [n_control_points, dim] 的数组
+        control_points = np.column_stack(all_control_points)
+
+        # print("Uniform B-spline compression done.")
+        # print("control points:", control_points.shape)
+        # # 可视化的时候，左右还需要重复一次，但是可以不预测interior_knots了
+        # print("interior knots:", interior_knots.shape) 
+        return control_points
+    
+    def get_visualization_points(self, compressed_output: np.ndarray, original_trajectory: np.ndarray, num_points: int = 100):
+        """
+        获取用于可视化的B-spline重构点和对应的时间坐标
+        
+        Args:
+            compressed_output: __call__() 返回的控制点 [n_control_points, dim]
+            original_trajectory: 原始轨迹 [T, dim]，用于确定时间范围
+            num_points: 重构的点数（默认100，用于平滑可视化）
+        
+        Returns:
+            x_coords: 时间坐标 [num_points]
+            trajectory_points: 重构的轨迹点 [num_points, dim]
+        """
+        control_points = compressed_output
+        original_length = len(original_trajectory)
+        dim = original_trajectory.shape[1]
+        
+        # 时间参数化
+        x_min, x_max = 0.0, float(original_length - 1)
+        
+        # 重构 interior_knots（与 __call__ 中相同）
+        interior_knots = np.linspace(x_min, x_max, self.target_length + 2)[1:-1]
+        
+        # 构造完整的 knot vector
+        knot_vector = np.concatenate([
+            np.repeat(x_min, self.degree + 1),
+            interior_knots,
+            np.repeat(x_max, self.degree + 1)
+        ])
+        
+        # 生成均匀的评估点
+        x_coords = np.linspace(x_min, x_max, num_points)
+        
+        # 对每个维度重构 B-spline 并评估
+        trajectory_points = np.zeros((num_points, dim))
+        for d in range(dim):
+            bspline = BSpline(knot_vector, control_points[:, d], self.degree)
+            trajectory_points[:, d] = bspline(x_coords)
+        
+        return x_coords, trajectory_points
+
+
+# ==============================================================================
+# 这里开始是fixed freq的压缩方法（实验区域
+# ==============================================================================
+
 @register_trajectory_compression("fix_freq_bining")
 class FixFreqBiningTrajectoryCompression(BaseTrajectoryCompression):
     def __init__(self, target_length: int = 50):
@@ -249,13 +378,44 @@ class FixFreqUniformBSplineTrajectoryCompression(BaseTrajectoryCompression):
         
         return x_coords, trajectory_points
 
-    
+
+# ==============================================================================
+# 这里开始是积分轨迹（positional）的压缩方法（实验区域
+# ==============================================================================
+
+
+@register_trajectory_compression("positional_bining")
+class PositionalBiningTrajectoryCompression(BaseTrajectoryCompression):
+    def __init__(self, target_length: int = 50):
+        self.target_length = target_length
+        self.exp_type = "positional"
+
+    def __call__(self, trajectory: np.ndarray) -> np.ndarray:
+        # 对轨迹进行累积和操作（将差分转换为绝对位置）
+        trajectory = np.cumsum(trajectory, axis=0)
+        
+        original_length = trajectory.shape[0]
+        
+        # 如果原始长度不足目标长度，先填充（与 action_chunk 保持一致）
+        if original_length < self.target_length:
+            # 重复最后一个点来填充
+            last_point = trajectory[-1:]
+            num_padding = self.target_length - original_length
+            padding = np.repeat(last_point, num_padding, axis=0)
+            trajectory = np.vstack([trajectory, padding])
+            return trajectory
+        
+        # 如果长度足够，均匀采样
+        indices = np.linspace(0, original_length - 1, num=self.target_length)
+        compressed_trajectory = np.array([trajectory[int(idx)] for idx in indices])
+        return compressed_trajectory
+
 # 拟合方法，加权最小二乘, s这个参数代表是否平滑拟合
 # scipy.interpolate.splrep(x, y, s=0, k=3) 名称：Spline representation, 输出：三元组 (t(knots), c(control), k)
 # scipy.interpolate.splev(x_new, tck)  名称：Spline evaluation （这两个只是插值）
 # scipy.interpolate.make_lsq_spline(x, y, t, k) 名称：Least-squares B-spline representation（真正的拟合函数）
-@register_trajectory_compression("uniform_bspline")
-class UniformBSplineTrajectoryCompression(BaseTrajectoryCompression):
+@register_trajectory_compression("positional_uniform_bspline")
+class PositionalUniformBSplineTrajectoryCompression(BaseTrajectoryCompression):
     def __init__(self, target_length: int = 20, degree: int = 3):
         """
         固定点数的B样条压缩：用固定数量的内部节点来拟合B样条，通过最小二乘法优化控制点。
@@ -266,6 +426,7 @@ class UniformBSplineTrajectoryCompression(BaseTrajectoryCompression):
         """
         self.target_length = target_length
         self.degree = degree
+        self.exp_type = "positional"
 
     def __call__(self, trajectory: np.ndarray) -> np.ndarray:
         """
@@ -283,6 +444,8 @@ class UniformBSplineTrajectoryCompression(BaseTrajectoryCompression):
             control_points: [n_control_points, dim] 的numpy数组，n = target_length + degree + 1
             interior_knots: [target_length] 内部节点位置
         """
+        # 对轨迹进行累积和操作（将差分转换为绝对位置）
+        trajectory = np.cumsum(trajectory, axis=0)
 
         original_length = trajectory.shape[0]
         dim = trajectory.shape[1] if len(trajectory.shape) > 1 else 1
@@ -373,6 +536,26 @@ class UniformBSplineTrajectoryCompression(BaseTrajectoryCompression):
             trajectory_points[:, d] = bspline(x_coords)
         
         return x_coords, trajectory_points
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Adapative 还没有准备好，先在普通方法上弄好再弄
 
 
 @register_trajectory_compression("adaptive_bspline")
@@ -712,7 +895,7 @@ if __name__ == "__main__":
         sys.path.insert(0, str(project_root))
     
     from prismatic.vla.tokenizer import DummyTokenizer
-    from prismatic.vla.dataset_v1 import MyLeRobotDataset
+    from Project.Aff.vla.prismatic.vla.dataset import MyLeRobotDataset
     
     # 配置日志
     logging.basicConfig(

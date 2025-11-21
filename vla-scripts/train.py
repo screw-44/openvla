@@ -42,6 +42,14 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 local_rank = int(os.environ.get("LOCAL_RANK", 0))
 torch.cuda.set_device(local_rank)
 
+# [TODO: Fix for NCCL Error] Explicitly initialize process group with device_id
+# This prevents "using GPU X as device used by this process is currently unknown"
+if not dist.is_initialized():
+    dist.init_process_group(
+        backend="nccl",
+        init_method="env://",
+        device_id=torch.device(f"cuda:{local_rank}")
+    )
 
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)

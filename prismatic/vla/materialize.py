@@ -14,7 +14,7 @@ from prismatic.models.backbones.vision import ImageTransform
 from prismatic.util.data_utils import PaddedCollatorForActionPrediction
 
 from prismatic.vla.tokenizer import ValueTextualizeTC, BaseTrajectoryConverter, VlaTokenizer
-from prismatic.vla.dataset_v1 import MyLeRobotDataset
+from prismatic.vla.dataset import MyLeRobotDataset
 from prismatic.vla.trajectory_compression import TRAJECTORY_COMPRESSION_REGISTRY
 
 def get_vla_dataset_and_collator(

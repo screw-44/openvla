@@ -147,9 +147,9 @@ class Base(VLAConfig):
     vla_id: str = "base"
     base_vlm: Union[str, Path] = "TRI-ML/prismatic-vlms/siglip-224px+7b"
 
-    freeze_vision_backbone: bool = True
-    freeze_llm_backbone: bool = True  
-    unfreeze_last_llm_layer: bool = True
+    freeze_vision_backbone: bool = False
+    freeze_llm_backbone: bool = False  
+    unfreeze_last_llm_layer: bool = False
 
     shuffle_buffer_size: int = 256_000 # Smaller buffer for lightweight training
 
