@@ -141,11 +141,6 @@ class Exp_DinoSigLIP_224px_OXE_Magic_Soup_Plus(Exp_SigLIP_224px_Bridge):
     global_batch_size: int = 2048
     per_device_batch_size: int = 32
 
-
-# === OpenVLA Fine-tuning Configurations ===
-
-
-
 # === [1 GPU] Lightweight Custom Trajectory Training ===
 @dataclass
 class Base(VLAConfig):
@@ -155,15 +150,12 @@ class Base(VLAConfig):
     freeze_vision_backbone: bool = False
     freeze_llm_backbone: bool = False  
     unfreeze_last_llm_layer: bool = False
-
     shuffle_buffer_size: int = 256_000 # Smaller buffer for lightweight training
 
-    # Optimization Parameters - optimized for single GPU (epochs and max_steps now in RunConfig)
     # H100 Settings
     # Note: global_batch_size = -1 means auto-compute: per_device_batch_size * number_of_gpus
     global_batch_size: int = -1  # Auto-computed in __post_init__
     per_device_batch_size: int = 32
-
 
     learning_rate: float = 5e-5   # Slightly higher LR for faster convergence
     weight_decay: float = 0.01    # Add some regularization
@@ -176,10 +168,9 @@ class Base(VLAConfig):
     use_flash_attention_2: bool = True
     enable_mixed_precision_training: bool = True
 
-
 @dataclass
 class Base_4090(Base):
-    vla_id = "base_4090"
+    vla_id: str = "base_4090"
     
     freeze_vision_backbone: bool = True
     freeze_llm_backbone: bool = True  
@@ -187,21 +178,16 @@ class Base_4090(Base):
 
     per_device_batch_size: int = 1
 
-
-
 # === Define a VLA Registry Enum for Reference & Validation ===
 @unique
 class VLARegistry(Enum):
     # Sanity Check Configurations =>> BridgeV2
     SIGLIP_224PX_MX_BRIDGE = Exp_SigLIP_224px_Bridge
     DINOSIGLIP_224PX_MX_BRIDGE = Exp_DinoSigLIP_224px_Bridge
-
     # SigLIP Frozen Backbone Experiment
     FREEZE_SIGLIP_224PX_MX_BRIDGE = Exp_FreezeVIT_SigLIP_224px_Bridge
-
     # [OpenVLA v0.1 7B] SigLIP 224px + OXE Magic Soup
     SIGLIP_224PX_MX_OXE_MAGIC_SOUP = Exp_SigLIP_224px_OXE_Magic_Soup
-
     # [OpenVLA 7B] DINO + SigLIP 224px + OXE Magic Soup++
     DINOSIGLIP_224PX_MX_OXE_MAGIC_SOUP_PLUS = Exp_DinoSigLIP_224px_OXE_Magic_Soup_Plus
 

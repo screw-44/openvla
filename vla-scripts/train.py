@@ -195,11 +195,7 @@ def train(cfg: RunConfig) -> None:
 
     # Configure Unique Run Name & Save Directory
     vla_id = cfg.vla.vla_id
-    cfg.run_id = (
-        f"{vla_id}+b{cfg.vla.per_device_batch_size}+x{cfg.seed}"
-        if cfg.run_id is None
-        else cfg.run_id
-    )
+    cfg.run_id = f"{vla_id}+b{cfg.vla.per_device_batch_size}+x{cfg.seed}" if cfg.run_id is None else cfg.run_id
     if cfg.run_id_note is not None:
         cfg.run_id += f"--{cfg.run_id_note}"
 
@@ -209,7 +205,7 @@ def train(cfg: RunConfig) -> None:
     worker_init_fn = set_global_seed(cfg.seed, get_worker_init_fn=True)
     os.makedirs(run_dir := (cfg.run_root_dir / cfg.run_id), exist_ok=True)
     os.makedirs(cfg.run_root_dir / cfg.run_id / "checkpoints", exist_ok=True)
-
+    
     # Save Configuration =>> additionally save a JSON version for later HF Integration
     if overwatch.is_rank_zero():
         draccus.dump(cfg, open(run_dir / "config.yaml", "w"))

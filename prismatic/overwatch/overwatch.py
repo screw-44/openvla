@@ -91,59 +91,57 @@ class DistributedOverwatch:
     def world_size(self) -> int:
         return self.distributed_state.num_processes
 
-
-class PureOverwatch:
-    def __init__(self, name: str) -> None:
-        """Initializer for an Overwatch object that just wraps logging."""
-        self.logger = ContextAdapter(logging.getLogger(name), extra={})
-
-        # Logger Delegation (for convenience; would be nice to just compose & dynamic dispatch eventually)
-        self.debug = self.logger.debug
-        self.info = self.logger.info
-        self.warning = self.logger.warning
-        self.error = self.logger.error
-        self.critical = self.logger.critical
-
-        # Logging Defaults =>> INFO
-        self.logger.setLevel(logging.INFO)
-
-    @staticmethod
-    def get_identity_ctx() -> Callable[..., Any]:
-        def identity(fn: Callable[..., Any]) -> Callable[..., Any]:
-            return fn
-
-        return identity
-
-    @property
-    def rank_zero_only(self) -> Callable[..., Any]:
-        return self.get_identity_ctx()
-
-    @property
-    def local_zero_only(self) -> Callable[..., Any]:
-        return self.get_identity_ctx()
-
-    @property
-    def rank_zero_first(self) -> Callable[..., Any]:
-        return nullcontext
-
-    @property
-    def local_zero_first(self) -> Callable[..., Any]:
-        return nullcontext
-
-    @staticmethod
-    def is_rank_zero() -> bool:
-        return True
-
-    @staticmethod
-    def rank() -> int:
-        return 0
-
-    @staticmethod
-    def world_size() -> int:
-        return 1
-
-
-def initialize_overwatch(name: str) -> Union[DistributedOverwatch, PureOverwatch]:
+def initialize_overwatch(name: str) -> DistributedOverwatch:
     return DistributedOverwatch(name) 
 
  # 永远采用分布的方式，哪怕只有一张卡（反正兼容） if int(os.environ.get("WORLD_SIZE", -1)) != -1 else PureOverwatch(name)
+
+# class PureOverwatch:
+#     def __init__(self, name: str) -> None:
+#         """Initializer for an Overwatch object that just wraps logging."""
+#         self.logger = ContextAdapter(logging.getLogger(name), extra={})
+
+#         # Logger Delegation (for convenience; would be nice to just compose & dynamic dispatch eventually)
+#         self.debug = self.logger.debug
+#         self.info = self.logger.info
+#         self.warning = self.logger.warning
+#         self.error = self.logger.error
+#         self.critical = self.logger.critical
+
+#         # Logging Defaults =>> INFO
+#         self.logger.setLevel(logging.INFO)
+
+#     @staticmethod
+#     def get_identity_ctx() -> Callable[..., Any]:
+#         def identity(fn: Callable[..., Any]) -> Callable[..., Any]:
+#             return fn
+
+#         return identity
+
+#     @property
+#     def rank_zero_only(self) -> Callable[..., Any]:
+#         return self.get_identity_ctx()
+
+#     @property
+#     def local_zero_only(self) -> Callable[..., Any]:
+#         return self.get_identity_ctx()
+
+#     @property
+#     def rank_zero_first(self) -> Callable[..., Any]:
+#         return nullcontext
+
+#     @property
+#     def local_zero_first(self) -> Callable[..., Any]:
+#         return nullcontext
+
+#     @staticmethod
+#     def is_rank_zero() -> bool:
+#         return True
+
+#     @staticmethod
+#     def rank() -> int:
+#         return 0
+
+#     @staticmethod
+#     def world_size() -> int:
+#         return 1
