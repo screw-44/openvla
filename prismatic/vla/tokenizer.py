@@ -13,6 +13,15 @@ from prismatic.models.backbones.vision.base_vision import ImageTransform
 from prismatic.models.backbones.llm.prompting.base_prompter import PromptBuilder
 from prismatic.models.vlms.prismatic import IGNORE_INDEX
 
+
+TRAJECTORY_CONVERTER_REGISTRY = {}
+
+def register_trajectory_converter(name: str):
+    def decorator(cls):
+        TRAJECTORY_CONVERTER_REGISTRY[name] = cls
+        return cls
+    return decorator
+
 # 不同的数据集有不同的表征方式. libero是x,y,z,yaw,pitch,row + gripper夹取。
 # 但是别的数据集是不一样的，比如说智元添加了双臂+底盘。 
 class BaseTrajectoryConverter(ABC):
@@ -30,6 +39,7 @@ class BaseTrajectoryConverter(ABC):
     def decode_text_ids_to_trajectory(self, texts: str) -> np.ndarray:
         pass
 
+@register_trajectory_converter("value_textualize")
 class ValueTextualizeTC(BaseTrajectoryConverter):
     """
         最简单的离散化方式：直接将浮点数转换成字符串表示，并用空格分隔开。TC代表Trajectory Converter。

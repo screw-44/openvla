@@ -56,19 +56,6 @@ def get_vla(cfg):
     if not cfg.load_in_8bit and not cfg.load_in_4bit:
         vla = vla.to(DEVICE)
 
-    # Load dataset stats used during finetuning (for action un-normalization).
-    dataset_statistics_path = os.path.join(cfg.pretrained_checkpoint, "dataset_statistics.json")
-    if os.path.isfile(dataset_statistics_path):
-        with open(dataset_statistics_path, "r") as f:
-            norm_stats = json.load(f)
-        vla.norm_stats = norm_stats
-    else:
-        print(
-            "WARNING: No local dataset_statistics.json file found for current checkpoint.\n"
-            "You can ignore this if you are loading the base VLA (i.e. not fine-tuned) checkpoint."
-            "Otherwise, you may run into errors when trying to call `predict_action()` due to an absent `unnorm_key`."
-        )
-
     return vla
 
 
@@ -131,7 +118,7 @@ def crop_and_resize(image, crop_scale, batch_size):
     return resized
 
 
-def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, center_crop=False):
+def get_vla_action(vla, processor, base_vla_name, obs, task_label, center_crop=False):
     """Generates an action with the VLA policy."""
     image = Image.fromarray(obs["full_image"])
     image = image.convert("RGB")
@@ -166,6 +153,7 @@ def get_vla_action(vla, processor, base_vla_name, obs, task_label, unnorm_key, c
     # Process inputs.
     inputs = processor(prompt, image).to(DEVICE, dtype=torch.bfloat16)
 
-    # Get action.
-    action = vla.predict_action(**inputs, unnorm_key=unnorm_key, do_sample=False)
+    # Get action (returns dict with 'action', 'action_tokens', 'normalized_actions')
+    result = vla.predict_action(**inputs, do_sample=False)
+    action = result['action']  # Extract continuous action for execution
     return action

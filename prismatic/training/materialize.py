@@ -21,7 +21,7 @@ TRAIN_STRATEGIES = {
 
 def get_train_strategy(
     train_strategy: str,
-    vlm: PrismaticVLM,
+    vla: PrismaticVLM,
     device_id: int,
     stage: str,
     epochs: int,
@@ -42,7 +42,7 @@ def get_train_strategy(
     if train_strategy in TRAIN_STRATEGIES:
         strategy_cfg = TRAIN_STRATEGIES[train_strategy]
         strategy = strategy_cfg["cls"](
-            vlm=vlm,
+            vla=vla,
             device_id=device_id,
             stage=stage,
             epochs=epochs,

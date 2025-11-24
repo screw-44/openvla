@@ -50,6 +50,11 @@ class VLAConfig(ChoiceRegistry):
     enable_mixed_precision_training: bool = True    # Enable Traditional BF16 Mixed Precision
     reduce_in_full_precision: bool = True           # Accumulate/Reduce All-Gather Gradients in FP32 Full Precision
 
+    # Trajectory Converter Configuration
+    trajectory_converter_type: str = 'value_textualize'  # Converter type for action discretization
+    trajectory_n_bins: int = 256                    # Number of bins for discretization
+    trajectory_n_dims: int = 7                      # Action dimensions (e.g., 7DOF for Libero)
+
     # fmt: on
 
     def __post_init__(self) -> None:
@@ -172,6 +177,18 @@ class Base(VLAConfig):
     enable_mixed_precision_training: bool = True
 
 
+@dataclass
+class Base_4090(Base):
+    vla_id = "base_4090"
+    
+    freeze_vision_backbone: bool = True
+    freeze_llm_backbone: bool = True  
+    unfreeze_last_llm_layer: bool = True
+
+    per_device_batch_size: int = 1
+
+
+
 # === Define a VLA Registry Enum for Reference & Validation ===
 @unique
 class VLARegistry(Enum):
@@ -190,6 +207,7 @@ class VLARegistry(Enum):
 
     # === Custom Trajectory Training ===
     Base = Base
+    Base_4090 = Base_4090
 
     @property
     def vla_id(self) -> str:

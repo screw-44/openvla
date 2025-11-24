@@ -28,7 +28,7 @@ import yaml
 
 # 不再从 prismatic.conf.run 导入 RunConfig
 from prismatic.conf import VLAConfig, VLARegistry, ModeConfig, ModeRegistry, DatasetConfig, DatasetRegistry
-from prismatic.models import load, load_vla
+from prismatic.models import load
 from prismatic.overwatch import initialize_overwatch
 from prismatic.training import VLAMetrics, get_train_strategy
 from prismatic.util import set_global_seed
@@ -231,15 +231,15 @@ def train(cfg: RunConfig) -> None:
     if checkpoint_to_load is not None:
         if cfg.mode.is_resume:
             print("[*] Loading VLA from Pretrained Checkpoint:", checkpoint_to_load)
-            vlm = load_vla(checkpoint_to_load, hf_token=hf_token, load_for_training=True)
+            vla = load(checkpoint_to_load, hf_token=hf_token, load_for_training=True)
         elif cfg.mode.is_test:
             print("[*] Loading VLA from Checkpoint for Validate/Test:", cfg.mode.validate_checkpoint_path)
-            vlm = load_vla(cfg.mode.validate_checkpoint_path, hf_token=hf_token, load_for_training=False)
+            vla = load(cfg.mode.validate_checkpoint_path, hf_token=hf_token, load_for_training=False)
     else:
-        vlm = load(cfg.vla.base_vlm, hf_token=hf_token, load_for_training=True)
+        vla = load(cfg.vla.base_vlm, hf_token=hf_token, load_for_training=True)
 
     # [Validate] Model should be in Full Precision!
-    for param in vlm.parameters():
+    for param in vla.parameters():
         assert param.dtype == torch.float32, f"Loaded VLM parameter not in full precision: {param}"
 
     # Determine training "stage" based on frozen vs unfrozen parameters --> supports different fine-tuning schemes!
@@ -263,11 +263,11 @@ def train(cfg: RunConfig) -> None:
 
     # [Explicit] Call to `freeze_backbones` here for clarity =>> will log exactly what is/is not frozen
     overwatch.info(f"Invoking `VLM.freeze_backbones()` for `{vla_id}` => Stage: `{stage}`")
-    vlm.freeze_backbones(stage)
+    vla.freeze_backbones(stage)
 
     # Print number of total/trainable model parameters
-    num_params = sum(p.numel() for p in vlm.parameters())
-    num_trainable_params = sum(p.numel() for p in vlm.parameters() if p.requires_grad)
+    num_params = sum(p.numel() for p in vla.parameters())
+    num_trainable_params = sum(p.numel() for p in vla.parameters() if p.requires_grad)
     overwatch.info(
         f"# Parameters (in millions): {num_params / 10**6:.3f} Total, {num_trainable_params / 10**6:.3f} Trainable"
     )
@@ -278,18 +278,20 @@ def train(cfg: RunConfig) -> None:
         data_repo_id=cfg.dataset.repo_id,
         data_task_ids=cfg.dataset.get_task_ids(),
         trajectory_compression_method=cfg.dataset.trajectory_compression,
-        data_dims=7,
-        base_tokenizer=vlm.llm_backbone.get_tokenizer(),
-        prompt_builder_fn=vlm.llm_backbone.prompt_builder_fn,
-        image_transform=vlm.vision_backbone.get_image_transform(),
-        default_image_resolution=vlm.vision_backbone.default_image_resolution,
+        trajectory_converter_type=cfg.vla.trajectory_converter_type,
+        trajectory_n_bins=cfg.vla.trajectory_n_bins,
+        trajectory_n_dims=cfg.vla.trajectory_n_dims,
+        base_tokenizer=vla.llm_backbone.get_tokenizer(),
+        prompt_builder_fn=vla.llm_backbone.prompt_builder_fn,
+        image_transform=vla.vision_backbone.get_image_transform(),
+        default_image_resolution=vla.vision_backbone.default_image_resolution,
     )
 
     # Create Train Strategy
     overwatch.info(f"Initializing Train Strategy `{cfg.vla.train_strategy}`")
     train_strategy = get_train_strategy(
         train_strategy=cfg.vla.train_strategy,
-        vlm=vlm,
+        vla=vla,
         device_id=device_id,
         stage=stage,
         epochs=cfg.epochs,
@@ -331,7 +333,6 @@ def train(cfg: RunConfig) -> None:
         train_strategy.validate_vla(
             vla_dataset,
             collator,
-            trajectory_converter,
             metrics,
             mode_config=cfg.mode,
         )
@@ -341,7 +342,6 @@ def train(cfg: RunConfig) -> None:
         train_strategy.train_vla(
             vla_dataset,
             collator,
-            trajectory_converter,
             metrics,
             run_dir=run_dir,
             save_interval=cfg.save_interval,

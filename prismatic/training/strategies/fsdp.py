@@ -55,7 +55,7 @@ def _deep_copy_to_cpu(obj: Any) -> Any:
 class FSDPStrategy(RunStrategy):
     def __init__(
         self,
-        vlm: PrismaticVLM,
+        vla: PrismaticVLM,
         device_id: int,
         stage: str,
         epochs: int,
@@ -76,7 +76,7 @@ class FSDPStrategy(RunStrategy):
         state_dict_type: StateDictType = StateDictType.FULL_STATE_DICT,
     ) -> None:
         super().__init__(
-            vlm=vlm,
+            vla=vla,
             device_id=device_id,
             stage=stage,
             epochs=epochs,
@@ -155,7 +155,7 @@ class FSDPStrategy(RunStrategy):
         Stage 2: Copy + detach to CPU (GPU weights untouched, background save ready)
         Stage 3: Start async disk write in background thread (only rank 0)
         """
-        assert isinstance(self.vlm, FSDP), "FSDPStrategy.save_checkpoint assumes VLM is already wrapped in FSDP!"
+        assert isinstance(self.vla, FSDP), "FSDPStrategy.save_checkpoint assumes VLM is already wrapped in FSDP!"
 
         # Wait for any previous async save to complete
         if self.async_save_thread is not None and self.async_save_thread.is_alive():
@@ -167,8 +167,8 @@ class FSDPStrategy(RunStrategy):
         # Stage 1: Reconstruct full state_dict from FSDP shards (must be synchronous)
         # This is the bottleneck, but unavoidable - all ranks must participate in AllGather
         reconstruction_start = time.time()
-        with FSDP.state_dict_type(self.vlm, self.fsdp_state_dict_type, self.fsdp_save_policy):
-            full_vlm_state_dict = self.vlm.state_dict()
+        with FSDP.state_dict_type(self.vla, self.fsdp_state_dict_type, self.fsdp_save_policy):
+            full_vlm_state_dict = self.vla.state_dict()
             model_state_dicts = {
                 mkey: OrderedDict() for mkey in (self.trainable_module_keys if only_trainable else self.all_module_keys)
             }
@@ -232,7 +232,7 @@ class FSDPStrategy(RunStrategy):
 
     def run_setup(self, run_dir: Path, n_train_examples: int) -> None:
         # Iteratively Assemble FSDP Wrapping Policy by fetching the wrapping policies for each backbone/constituent
-        vlm_fsdp_wrapping_policy = self.vlm.get_fsdp_wrapping_policy()
+        vlm_fsdp_wrapping_policy = self.vla.get_fsdp_wrapping_policy()
 
 
         # Assemble the Default FSDP Mixed Precision Policy
@@ -247,7 +247,7 @@ class FSDPStrategy(RunStrategy):
             # When running FSDP with a frozen vision backbone --> move to half precision!
             if self.stage not in {"full-finetune", "vla-full-train", "vla-sandwich-train"}:
                 overwatch.info("Casting Vision Backbone to *Half Precision* via `.to(dtype=...)`")
-                self.vlm.vision_backbone.to(dtype=self.vlm.vision_backbone.half_precision_dtype)
+                self.vla.vision_backbone.to(dtype=self.vla.vision_backbone.half_precision_dtype)
 
         else:
             # If we're not using mixed precision, everything is in default full precision!
@@ -256,8 +256,8 @@ class FSDPStrategy(RunStrategy):
             )
 
         # <FSDP> => note that FSDP will automatically take care of device placement (similar to `autocast`)
-        self.vlm = FSDP(
-            self.vlm,
+        self.vla = FSDP(
+            self.vla,
             auto_wrap_policy=vlm_fsdp_wrapping_policy,
             mixed_precision=fsdp_precision_policy,
             sharding_strategy=self.fsdp_sharding_strategy,
@@ -279,7 +279,7 @@ class FSDPStrategy(RunStrategy):
                 return isinstance(submodule, self.llm_transformer_layer_cls)
 
             # Note that the terms "activation checkpointing" and "gradient checkpointing" are synonymous!
-            apply_activation_checkpointing(self.vlm, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=check_fn)
+            apply_activation_checkpointing(self.vla, checkpoint_wrapper_fn=non_reentrant_wrapper, check_fn=check_fn)
 
         # Barrier =>> Sharding takes a minute?
         dist.barrier()
@@ -299,7 +299,7 @@ class FSDPStrategy(RunStrategy):
             # Default AdamW w/ specified LR & Linear Warmup / Cosine Decay & Weight Decay
             #   => Create Parameter Groups --> bias terms, normalization layer parameters shouldn't be decayed!
             decay, no_decay = [], []
-            for name, param in self.vlm.named_parameters():
+            for name, param in self.vla.named_parameters():
                 if not param.requires_grad:
                     continue
 
@@ -324,7 +324,7 @@ class FSDPStrategy(RunStrategy):
             # Default AdamW w/ specified LR & Linear Warmup / Cosine Decay & Weight Decay
             #   => Create Parameter Groups --> bias terms, normalization layer parameters shouldn't be decayed!
             decay, no_decay = [], []
-            for name, param in self.vlm.named_parameters():
+            for name, param in self.vla.named_parameters():
                 if not param.requires_grad:
                     continue
 
@@ -366,4 +366,4 @@ class FSDPStrategy(RunStrategy):
 
     def clip_grad_norm(self) -> None:
         # Note =>> FSDP uses a custom `clip_grad_norm_` function; requires *uniform grad dtype*
-        self.vlm.clip_grad_norm_(max_norm=self.max_grad_norm)
+        self.vla.clip_grad_norm_(max_norm=self.max_grad_norm)

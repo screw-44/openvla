@@ -25,20 +25,19 @@ from prismatic.training.metrics import VLAMetrics
 from prismatic.util import check_bloat16_supported
 from prismatic.util.batching_utils import SplitModalitySampler
 from prismatic.util.data_utils import PaddedCollatorForActionPrediction, PaddedCollatorForLanguageModeling
-from prismatic.vla.tokenizer import BaseTrajectoryConverter
 from prismatic.conf import ModeConfig
 
 
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
 
-DATA_LOADER_NUM_WORKERS = 8
+DATA_LOADER_NUM_WORKERS = 12
 
 # === Abstract Base Class for an arbitrary Training Strategy ===
 class RunStrategy(ABC):
     def __init__(
         self,
-        vlm: PrismaticVLM,
+        vla: PrismaticVLM,
         device_id: int,
         stage: str,
         epochs: int,
@@ -57,11 +56,11 @@ class RunStrategy(ABC):
         worker_init_fn: Optional[Callable[[int], None]] = None,
         **_: str,
     ) -> None:
-        self.vlm, self.device_id, self.stage = vlm, device_id, stage
+        self.vla, self.device_id, self.stage = vla, device_id, stage
 
         # Get relevant VLM instance parameters before they get (potentially) wrapped
-        self.all_module_keys, self.trainable_module_keys = self.vlm.all_module_keys, self.vlm.trainable_module_keys
-        self.llm_transformer_layer_cls = self.vlm.llm_backbone.transformer_layer_cls
+        self.all_module_keys, self.trainable_module_keys = self.vla.all_module_keys, self.vla.trainable_module_keys
+        self.llm_transformer_layer_cls = self.vla.llm_backbone.transformer_layer_cls
 
         # Optimization Parameters
         self.epochs, self.max_steps = epochs, max_steps
@@ -112,8 +111,7 @@ class RunStrategy(ABC):
     def train_vla(
         self,
         vla_dataset: Dataset,
-        collator: PaddedCollatorForActionPrediction, # TODO 看一下是否兼容
-        trajectory_converter: BaseTrajectoryConverter,
+        collator: PaddedCollatorForActionPrediction, # TODO: 看一下是否兼容
         metrics: VLAMetrics,
         run_dir: Path,
         save_interval: int = 2500,
@@ -127,7 +125,6 @@ class RunStrategy(ABC):
         Args:
             vla_dataset: Training dataset
             collator: Data collator for batching
-            trajectory_converter: Converter for trajectory encoding/decoding
             metrics: Metrics tracker
             run_dir: Directory path for saving checkpoints
             save_interval: Interval (in steps) for saving checkpoints
@@ -174,7 +171,7 @@ class RunStrategy(ABC):
             range(int(max_epochs)), desc=f"Epochs", leave=True, disable=not overwatch.is_rank_zero(), position=0
         )
         for epoch in epoch_progress:
-            self.vlm.train()
+            self.vla.train()
             # Zero Gradients (just in case)
             self.optimizer.zero_grad()
 
@@ -191,7 +188,7 @@ class RunStrategy(ABC):
                     "cuda", dtype=self.mixed_precision_dtype, enabled=self.enable_mixed_precision_training
                 ):
                     # [Contract] self.vlm.forward() must automatically compute `loss` and return!
-                    output: CausalLMOutputWithPast = self.vlm(
+                    output: CausalLMOutputWithPast = self.vla(
                         input_ids=batch["input_ids"],
                         attention_mask=batch["attention_mask"],
                         pixel_values=batch["pixel_values"],
@@ -214,9 +211,9 @@ class RunStrategy(ABC):
                 #   2) Compute boolean "mask" where "labels > 2" (where 2 is ID for `EOS_TOKEN`)
                 #           => If masking out EOS, then it's just "labels != -100 (IGNORE_INDEX)
                 #   3) Compute masked accuracy as `(pred == logits) & mask` --> sum/divide by # unmasked!
-                pred = output.logits[:, self.vlm.vision_backbone.num_patches : -1].argmax(dim=2)
+                pred = output.logits[:, self.vla.vision_backbone.num_patches : -1].argmax(dim=2)
                 gt = batch["labels"][:, 1:].to(pred.device)
-                mask = gt > trajectory_converter.trajectory_token_begin_idx
+                mask = gt > self.vla.trajectory_converter.trajectory_token_begin_idx
 
                 # Compute Accuracy
                 pred = (pred == gt) & mask
@@ -224,10 +221,10 @@ class RunStrategy(ABC):
 
                 # Compute L1 Loss on Predicted (Continuous) Actions
                 continuous_pred = torch.tensor(
-                    trajectory_converter.decode_text_ids_to_trajectory(pred[mask].cpu().numpy())
+                    self.vla.trajectory_converter.decode_text_ids_to_trajectory(pred[mask].cpu().numpy())
                 )
                 continuous_gt = torch.tensor(
-                    trajectory_converter.decode_text_ids_to_trajectory(gt[mask].cpu().numpy())
+                    self.vla.trajectory_converter.decode_text_ids_to_trajectory(gt[mask].cpu().numpy())
                 )
                 # print(f"continous_actions_pred - continous_actions_gt [0:5]: {continuous_pred[0:5] - continuous_gt[0:5]}")
 
@@ -261,9 +258,8 @@ class RunStrategy(ABC):
                     if metrics.global_step % mode_config.validate_interval == 0:
                         overwatch.info(f"Running Validation at Step {metrics.global_step}...")
                         self.validate_vla(
-                            vla_dataset, # TODO： 添加训练数据集/测试数据集/验证数据集的区分
+                            vla_dataset,
                             collator,
-                            trajectory_converter,
                             metrics,
                             mode_config=mode_config,
                         )
@@ -307,11 +303,10 @@ class RunStrategy(ABC):
         self,
         vla_dataset: Dataset,
         collator: PaddedCollatorForActionPrediction,
-        trajectory_converter: BaseTrajectoryConverter,
         metrics: "VLAMetrics",
         mode_config: ModeConfig,
     ) -> None:
-        """Run the VLA validation loop for the given `dataset` and `collator`; log losses, action metrics to trackio."""
+        """Run the VLA validation loop for the given `dataset` and `collator`; log losses, action metrics to trackio.        """
         # 设置拿到test的数据
         vla_dataset.get_train_data = False
 
@@ -336,8 +331,7 @@ class RunStrategy(ABC):
         )
 
         # === Testing ===
-        self.vlm.eval()
-
+        self.vla.eval()
         
         # Validation loop: iterate over epochs and batches
         total_batches_processed = 0
@@ -362,7 +356,7 @@ class RunStrategy(ABC):
                     "cuda", dtype=self.mixed_precision_dtype, enabled=self.enable_mixed_precision_training
                 ):
                     # [Contract] self.vlm.forward() must automatically compute `loss` and return!
-                    output: CausalLMOutputWithPast = self.vlm(
+                    output: CausalLMOutputWithPast = self.vla(
                         input_ids=batch["input_ids"],
                         attention_mask=batch["attention_mask"],
                         pixel_values=batch["pixel_values"],
@@ -379,9 +373,9 @@ class RunStrategy(ABC):
                 #   2) Compute boolean "mask" where "labels > 2" (where 2 is ID for `EOS_TOKEN`)
                 #           => If masking out EOS, then it's just "labels != -100 (IGNORE_INDEX)
                 #   3) Compute masked accuracy as `(pred == logits) & mask` --> sum/divide by # unmasked!
-                action_preds = output.logits[:, self.vlm.vision_backbone.num_patches : -1].argmax(dim=2)
+                action_preds = output.logits[:, self.vla.vision_backbone.num_patches : -1].argmax(dim=2)
                 gt = batch["labels"][:, 1:].to(action_preds.device)
-                mask = gt > trajectory_converter.trajectory_token_begin_idx
+                mask = gt > self.vla.trajectory_converter.trajectory_token_begin_idx
 
                 # Compute Accuracy
                 pred = (action_preds == gt) & mask
@@ -389,10 +383,10 @@ class RunStrategy(ABC):
 
                 # Compute L1 Loss on Predicted (Continuous) Actions
                 continuous_pred = torch.tensor(
-                    trajectory_converter.decode_text_ids_to_trajectory(action_preds[mask].cpu().numpy())
+                    self.vla.trajectory_converter.decode_text_ids_to_trajectory(action_preds[mask].cpu().numpy())
                 )
                 continuous_gt = torch.tensor(
-                    trajectory_converter.decode_text_ids_to_trajectory(gt[mask].cpu().numpy())
+                    self.vla.trajectory_converter.decode_text_ids_to_trajectory(gt[mask].cpu().numpy())
                 )
                 
                 # Collect metrics for trackio logging (only on rank 0)

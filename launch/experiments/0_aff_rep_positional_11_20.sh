@@ -46,8 +46,8 @@ cd "${PROJECT_ROOT}"
 
 # 定义要测试的所有 trajectory_compression 方法
 COMPRESSION_METHODS=(
-    "fix_freq_bining"
-    "fix_freq_uniform_bspline"
+    # "positional_bining"
+    "positional_uniform_bspline"
 )
 
 echo "============================================"

@@ -43,7 +43,6 @@ from prismatic.models.backbones.llm.prompting import PurePromptBuilder, VicunaV1
 from prismatic.util.data_utils import PaddedCollatorForActionPrediction
 from prismatic.vla.action_tokenizer import ActionTokenizer
 from prismatic.vla.datasets_old import RLDSBatchTransform, RLDSDataset
-from prismatic.vla.datasets_old.rlds.utils.data_utils import save_dataset_statistics
 
 from prismatic.extern.hf.configuration_prismatic import OpenVLAConfig
 from prismatic.extern.hf.modeling_prismatic import OpenVLAForActionPrediction
@@ -223,7 +222,7 @@ def finetune(cfg: FinetuneConfig) -> None:
 
     # [Important] Save Dataset Statistics =>> used to de-normalize actions for inference!
     if distributed_state.is_main_process:
-        save_dataset_statistics(vla_dataset.dataset_statistics, run_dir)
+        pass  # No longer saving dataset_statistics.json
 
     # Create Collator and DataLoader
     collator = PaddedCollatorForActionPrediction(
@@ -350,9 +349,6 @@ def finetune(cfg: FinetuneConfig) -> None:
                             # Prepare to save checkpoint in new directory
                             checkpoint_dir = Path(str(run_dir) + f"--{gradient_step_idx}_chkpt")
                             os.makedirs(checkpoint_dir, exist_ok=True)
-
-                            # Save dataset statistics to new directory
-                            save_dataset_statistics(vla_dataset.dataset_statistics, checkpoint_dir)
 
                             # Save processor and model weights to new directory
                             processor.save_pretrained(checkpoint_dir)

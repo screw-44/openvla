@@ -77,7 +77,7 @@ cd "${PROJECT_ROOT}"
 # 定义要测试的所有 trajectory_compression 方法
 COMPRESSION_METHODS=(
     "action_chunk"           # 不压缩（基线）
-    # "bining"         # 分箱压缩
+    #"bining"         # 分箱压缩
     # "uniform_bspline"   # 量化压缩
     # "adaptive_bspline"        # 空间压缩
 )

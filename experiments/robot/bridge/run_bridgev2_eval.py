@@ -83,9 +83,6 @@ def eval_model_in_bridge_env(cfg: GenerateConfig) -> None:
     assert cfg.pretrained_checkpoint is not None, "cfg.pretrained_checkpoint must not be None!"
     assert not cfg.center_crop, "`center_crop` should be disabled for Bridge evaluations!"
 
-    # [OpenVLA] Set action un-normalization key
-    cfg.unnorm_key = "bridge_orig"
-
     # Load model
     model = get_model(cfg)
 
