@@ -23,15 +23,19 @@ RUN_ID_NOTE="${RUN_ID_NOTE:-train-validate}"
 
 # 训练周期配置
 EPOCHS="${EPOCHS:-${DEFAULT_EPOCHS}}"
-MAX_STEPS="${MAX_STEPS:-10}"
+MAX_STEPS=6
 
 # 验证配置
-VALIDATE_INTERVAL=1          # 每N步验证一次
+VALIDATE_INTERVAL=10          # 每N步验证一次
 NUM_VALIDATION_BATCHES=10 # 每次验证使用的批次数
 VALIDATE_SAVE_DIR="${VALIDATE_SAVE_DIR:-runs/validation}" # 验证结果保存路径
 
+# 从pretrianed load吗
+IS_RESUME=true
+PRETRAINED_CHECKPOINT="/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/runs/base+b32+x7--aff_representation_251117-action_chunk/checkpoints/latest-checkpoint.pt"
+
 # 保存频率
-SAVE_INTERVAL=2 # 每N个epoch保存一次模型
+SAVE_INTERVAL=5 # 每N个epoch保存一次模型
 
 # ============================================================================
 # 启动训练+验证
@@ -53,7 +57,8 @@ cd "${PROJECT_ROOT}"
 # 构建命令参数
 TRAIN_CMD="torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} vla-scripts/train.py \
   --mode.type train_validate \
-  --mode.is_resume false \
+  --mode.is_resume ${IS_RESUME} \
+  --mode.pretrained_checkpoint ${PRETRAINED_CHECKPOINT} \
   --mode.validate_interval ${VALIDATE_INTERVAL} \
   --mode.num_validation_batches ${NUM_VALIDATION_BATCHES} \
   --mode.validate_save_dir \"${VALIDATE_SAVE_DIR}\" \

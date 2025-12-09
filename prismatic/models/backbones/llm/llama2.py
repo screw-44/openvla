@@ -40,7 +40,7 @@ LLAMA2_MODELS = {
         "llm_family": "llama2", "llm_cls": LlamaForCausalLM, "hf_hub_path": "meta-llama/Llama-2-13b-chat-hf"
     },
 
-    # === Vicuna v1.5 Chat Models, "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/huggingface/hub/models--lmsys--vicuna-7b-v1.5/snapshots/3321f76e3f527bd14065daf69dad9344000a201d"  ===        
+    # === Vicuna v1.5 Chat Models  ===        
     "vicuna-v15-7b": {
         "llm_family": "llama2", "llm_cls": LlamaForCausalLM, "hf_hub_path": "lmsys/vicuna-7b-v1.5"
     },
@@ -57,14 +57,12 @@ class LLaMa2LLMBackbone(HFCausalLLMBackbone):
         self,
         llm_backbone_id: str,
         llm_max_length: int = 2048,
-        hf_token: Optional[str] = None,
         inference_mode: bool = False,
         use_flash_attention_2: bool = True, # TODO: 4090上调试，先设置为False
     ) -> None:
         super().__init__(
             llm_backbone_id,
             llm_max_length=llm_max_length,
-            hf_token=hf_token,
             inference_mode=inference_mode,
             use_flash_attention_2=use_flash_attention_2,
             **LLAMA2_MODELS[llm_backbone_id],

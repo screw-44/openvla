@@ -24,6 +24,15 @@ from prismatic.vla.processor_wrapper import OpenVLAPolicyWrapper
 class TestIntegration(unittest.TestCase):
     """Integration tests for end-to-end workflows."""
     
+    @classmethod
+    def setUpClass(cls):
+        """Set up test fixtures once for all tests."""
+        from test_utils import get_default_checkpoint_path
+        
+        # Get default checkpoint path
+        cls.checkpoint_path = Path(get_default_checkpoint_path())
+        print(f"\n[TestSetup] Using checkpoint: {cls.checkpoint_path}")
+    
     def test_policy_wrapper_initialization(self):
         """Test that policy wrapper can be initialized."""
         # Use checkpoint from setUpClass
@@ -33,7 +42,6 @@ class TestIntegration(unittest.TestCase):
         try:
             policy = OpenVLAPolicyWrapper.from_pretrained(
                 str(checkpoint_path),
-                hf_token=os.environ.get("HF_TOKEN"),
             )
             
             # Check basic attributes
@@ -54,7 +62,6 @@ class TestIntegration(unittest.TestCase):
         # Initialize policy
         policy = OpenVLAPolicyWrapper.from_pretrained(
             str(checkpoint_path),
-            hf_token=os.environ.get("HF_TOKEN"),
         )
         
         # Create mock observation
@@ -85,7 +92,6 @@ class TestIntegration(unittest.TestCase):
         # Initialize policy
         policy = OpenVLAPolicyWrapper.from_pretrained(
             str(checkpoint_path),
-            hf_token=os.environ.get("HF_TOKEN"),
         )
         
         # Simulate multiple timesteps
@@ -117,7 +123,6 @@ class TestIntegration(unittest.TestCase):
         # Initialize policy
         policy = OpenVLAPolicyWrapper.from_pretrained(
             str(checkpoint_path),
-            hf_token=os.environ.get("HF_TOKEN"),
         )
         
         # Test different tasks

@@ -180,13 +180,16 @@ class RunStrategy(ABC):
                 enumerate(dataloader), desc=f"Epoch {epoch+1}/{max_epochs} - {status}",
                 leave=False, disable=not overwatch.is_rank_zero(), total=len(dataloader), position=1
             )
-
+            # TODO： 输入input_ids openvla的原来是给random数值进来的。逆天。
             for train_idx, batch in step_progress:
                 # Note that we'll unpack batch (and let AMP/FSDP do its thing) in the VLM.forward() call
                 #   => Basically, if we're using mixed precision (or not), autocast()/FSDP will move to device!
                 with torch.autocast(
                     "cuda", dtype=self.mixed_precision_dtype, enabled=self.enable_mixed_precision_training
                 ):
+                    
+                    print("input_ids:", batch["input_ids"])
+                    exit()
                     # [Contract] self.vlm.forward() must automatically compute `loss` and return!
                     output: CausalLMOutputWithPast = self.vla(
                         input_ids=batch["input_ids"],
@@ -214,6 +217,10 @@ class RunStrategy(ABC):
                 pred = output.logits[:, self.vla.vision_backbone.num_patches : -1].argmax(dim=2)
                 gt = batch["labels"][:, 1:].to(pred.device)
                 mask = gt > self.vla.trajectory_converter.trajectory_token_begin_idx
+                # print("pred length:", len(pred), ". gt length:", len(gt))
+                # print("mask", mask)
+                # print("pred", pred)
+                # exit()
 
                 # Compute Accuracy
                 pred = (pred == gt) & mask
@@ -431,35 +438,3 @@ class RunStrategy(ABC):
             overwatch.info(f"   - Loss: {avg_loss:.4f}")
             overwatch.info(f"   - Action accuracy: {avg_accuracy:.4f}")
             overwatch.info(f"   - Logged {len(sample_predictions)} prediction samples")
-
-               
-
-
-
-# Compute metrics per dataset --> only on rank_zero since we don't log them on other workers anyways
-# 多个数据集分别看收敛的曲线，还是比较实用的，保留了这个dataset_names的属性。
-# 这里实现遇到问题，看上去是在PaddedCollatorForActionPrediction里面没有添加这个属性进行传递，目前暂时关闭了这个功能
-# if overwatch.is_rank_zero():
-#     datasets = set(batch["dataset_names"])
-#     if len(datasets) > 1:
-#         for ds in datasets:
-#             ds_mask = torch.tensor([elem == ds for elem in batch["dataset_names"]])
-#             action_accuracy_ds = pred[ds_mask].sum().float() / mask[ds_mask].sum().float()
-#             continuous_actions_pred_ds = torch.tensor(
-#                 trajectory_converter.decode_text_ids_to_trajectory(
-#                     action_preds[ds_mask][mask[ds_mask]].cpu().numpy()
-#                 )
-#             )
-#             continuous_actions_gt_ds = torch.tensor(
-#                 trajectory_converter.decode_text_ids_to_trajectory(
-#                     gt[ds_mask][mask[ds_mask]].cpu().numpy()
-#                 )
-#             )
-#             action_l1_loss_ds = torch.nn.functional.l1_loss(
-#                 continuous_actions_pred_ds, continuous_actions_gt_ds
-#             )
-#             metrics.commit_for_dataset(
-#                 dataset_name=ds.decode(), action_accuracy=action_accuracy_ds, l1_loss=action_l1_loss_ds
-#             )
-
-

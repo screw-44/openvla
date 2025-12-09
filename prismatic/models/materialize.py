@@ -94,7 +94,6 @@ def get_vision_backbone_and_transform(
 def get_llm_backbone_and_tokenizer(
     llm_backbone_id: str,
     llm_max_length: int = 2048,
-    hf_token: Optional[str] = None,
     inference_mode: bool = False,
 ) -> Tuple[LLMBackbone, PreTrainedTokenizerBase]:
     if llm_backbone_id in LLM_BACKBONES:
@@ -102,7 +101,6 @@ def get_llm_backbone_and_tokenizer(
         llm_backbone: LLMBackbone = llm_cfg["cls"](
             llm_backbone_id,
             llm_max_length=llm_max_length,
-            hf_token=hf_token,
             inference_mode=inference_mode,
             **llm_cfg["kwargs"],
         )

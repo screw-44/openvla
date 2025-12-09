@@ -11,7 +11,6 @@ the AutoModelForCausalLM API (though we may add Seq2Seq models in the future).
 We make this assumption to keep the LLM handling in this codebase relatively lightweight, and to inherit all the nice HF
 utilities around different types of decoding/generation strategies.
 """
-
 import warnings
 from abc import ABC, abstractmethod
 from functools import partial
@@ -20,7 +19,7 @@ from typing import Callable, List, Optional, Sequence, Type
 import torch
 import torch.nn as nn
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
-from transformers import AutoConfig, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
+from transformers import AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from prismatic.models.backbones.llm.prompting import PromptBuilder
@@ -106,7 +105,6 @@ class HFCausalLLMBackbone(LLMBackbone, ABC):
         llm_cls: Type[PreTrainedModel],
         hf_hub_path: str,
         llm_max_length: int = 2048,
-        hf_token: Optional[str] = None,
         inference_mode: bool = False,
         use_flash_attention_2: bool = False,
     ) -> None:
@@ -115,31 +113,31 @@ class HFCausalLLMBackbone(LLMBackbone, ABC):
         self.llm_max_length = llm_max_length
         self.inference_mode = inference_mode
 
-        # Initialize LLM (downloading from HF Hub if necessary) --> `llm_cls` is the actual {Model}ForCausalLM class!
-        #   => Note: We're eschewing use of the AutoModel API so that we can be more explicit about LLM-specific details
-        if not self.inference_mode:
-            overwatch.info(f"Loading [bold]{llm_family}[/] LLM from [underline]`{hf_hub_path}`[/]", ctx_level=1)
-            # Prepare kwargs for model loading
-            model_kwargs = {
-                "token": hf_token,
-                # The following parameters are set to prevent `UserWarnings` from HF; we want greedy decoding!
-                "do_sample": False,
-                "temperature": 1.0,
-                "top_p": 1.0,
-            }
-            # Handle Flash Attention 2 for newer transformers versions (4.36+)
-            # New API uses attn_implementation instead of use_flash_attention_2
-            if use_flash_attention_2 and not self.inference_mode:
-                model_kwargs["attn_implementation"] = "flash_attention_2"
-            
+        # Initialize LLM (loading from local cache only) --> `llm_cls` is the actual {Model}ForCausalLM class!
+        #   => Note: We're using `local_files_only=True` to enforce offline mode and reject network access
+        overwatch.info(f"Loading [bold]{llm_family}[/] LLM from local cache [underline]`{hf_hub_path}`[/]", ctx_level=1)
+        # Prepare kwargs for model loading
+        model_kwargs = {
+            "local_files_only": True,  # CRITICAL: Force offline mode, reject network access
+            # The following parameters are set to prevent `UserWarnings` from HF; we want greedy decoding!
+            "do_sample": False,
+            "temperature": 1.0,
+            "top_p": 1.0,
+        }
+        # Handle Flash Attention 2 for newer transformers versions (4.36+)
+        # New API uses attn_implementation instead of use_flash_attention_2
+        if use_flash_attention_2:
+            model_kwargs["attn_implementation"] = "flash_attention_2"
+        
+        try:
             self.llm = llm_cls.from_pretrained(hf_hub_path, **model_kwargs)
-
-        # [Contract] `inference_mode` means we're loading from a pretrained checkpoint; no need to load base weights!
-        else:
-            overwatch.info(f"Building empty [bold]{llm_family}[/] LLM from [underline]`{hf_hub_path}`[/]", ctx_level=1)
-            llm_config = AutoConfig.from_pretrained(hf_hub_path, token=hf_token)
-            self.llm = llm_cls._from_config(llm_config)
-
+        except (OSError, FileNotFoundError) as e:
+            raise ValueError(
+                f"Failed to load {llm_family} LLM from local cache at `{hf_hub_path}`. "
+                f"The model does not appear to be cached locally. "
+                f"Error: {e}. "
+                f"Please ensure the model is pre-downloaded to the local cache."
+            )
         # Lightweight Handling (with extended explanation) for setting some LLM Parameters
         #   => Set `decoder.use_cache = False` --> incompatible with gradient checkpointing (+ training in general)
         #
@@ -152,11 +150,21 @@ class HFCausalLLMBackbone(LLMBackbone, ABC):
         if not self.inference_mode:
             self.llm.enable_input_require_grads()
 
-        # Load (Fast) Tokenizer
-        overwatch.info(f"Loading [bold]{llm_family}[/] (Fast) Tokenizer via the AutoTokenizer API", ctx_level=1)
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            hf_hub_path, model_max_length=self.llm_max_length, token=hf_token, padding_side="right"
-        )
+        # Load (Fast) Tokenizer (from local cache only)
+        overwatch.info(f"Loading [bold]{llm_family}[/] (Fast) Tokenizer via the AutoTokenizer API (local cache)", ctx_level=1)
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                hf_hub_path, 
+                model_max_length=self.llm_max_length, 
+                local_files_only=True,  # Force offline mode
+                padding_side="right"
+            )
+        except (OSError, FileNotFoundError) as e:
+            raise ValueError(
+                f"Failed to load {llm_family} tokenizer from local cache at `{hf_hub_path}`. "
+                f"Error: {e}. "
+                f"Please ensure the tokenizer is pre-downloaded to the local cache."
+            )
 
         # Validation =>> Our VLM logic currently operates under the assumption that the tokenization of a new input
         #                starts with a <BOS> token unless `add_special_tokens = False`; for these models, we empirically

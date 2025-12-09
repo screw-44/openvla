@@ -100,13 +100,14 @@ class TestVLAActionDecoderProcessorStep(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         # Load tokenizer from VLA checkpoint (no download)
-        from test_utils import get_default_checkpoint_path
+        from test_utils import get_default_checkpoint_path, load_vla_config_from_checkpoint
         from prismatic.models import load
         
         checkpoint_path = get_default_checkpoint_path()
+        vla_cfg = load_vla_config_from_checkpoint(checkpoint_path)
         vla = load(
-            checkpoint_path,
-            hf_token=os.environ.get("HF_TOKEN"),
+            vla_cfg=vla_cfg,
+            checkpoint_path=checkpoint_path,
             load_for_training=False,
         )
         
@@ -175,7 +176,6 @@ class TestPipelineIntegration(unittest.TestCase):
         # Setup
         base_tokenizer = AutoTokenizer.from_pretrained(
             "google/gemma-2b",
-            token=os.environ.get("HF_TOKEN"),
         )
         
         trajectory_converter = ValueTextualizeTC(

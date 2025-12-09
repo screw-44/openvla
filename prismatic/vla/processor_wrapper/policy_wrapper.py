@@ -14,6 +14,7 @@ import numpy as np
 import torch
 from PIL import Image
 
+from prismatic.conf.vla import VLAConfig
 from prismatic.models import load
 from prismatic.overwatch import initialize_overwatch
 from .processor_factory import make_openvla_processors
@@ -39,45 +40,32 @@ class OpenVLAPolicyWrapper:
     
     def __init__(
         self,
-        checkpoint_path: Path,
-        config_dict: Optional[Dict[str, Any]] = None,
-        device: str = "cuda",
-        hf_token: Optional[str] = None,
+        checkpoint_path: Path
     ):
         """
         Initialize the policy wrapper.
         
         Args:
             checkpoint_path: Path to VLA checkpoint
-            config_dict: Configuration dictionary (loaded from config.json if None)
-            device: Device to run model on
-            hf_token: HuggingFace token for model access
         """
         self.checkpoint_path = Path(checkpoint_path)
-        self.device = device
         
-        # Load configuration if not provided
-        if config_dict is None:
-            config_dict = self._load_config()
-        self.config = config_dict
+        # Load configuration
+        config = self._load_config()
+        vla_cfg = self._create_vla_config(config)
         
-        # Load VLA model using unified load function
+        # Load VLA model using unified load function with new API
         overwatch.info(f"Loading VLA model from: {self.checkpoint_path}")
         self.vla = load(
-            str(self.checkpoint_path),
-            hf_token=hf_token,
+            vla_cfg=vla_cfg,
+            checkpoint_path=str(self.checkpoint_path),
             load_for_training=False,  # Inference mode
         )
-        
-        # Move to device
-        if not hasattr(self.vla, 'device'):
-            self.vla = self.vla.to(device)
-        
         # Initialize processors
         overwatch.info("Initializing processor pipelines...")
         self.preprocessor, self.postprocessor = make_openvla_processors(
             vla_model=self.vla,
-            config_dict=self.config,
+            config_dict=config,
             dataset_ref=None,  # Will be set if needed for trajectory retrieval
         )
         
@@ -89,17 +77,52 @@ class OpenVLAPolicyWrapper:
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from config.json in checkpoint directory."""
         # Checkpoint path should be like: run_dir/checkpoints/step-xxx.pt
-        run_dir = self.checkpoint_path.parents[1]
-        config_path = run_dir / "config.json"
-        
-        if not config_path.exists():
+        config_path = self.checkpoint_path.parents[1] / "config.json"
+        if not config_path.exists(): 
             raise FileNotFoundError(f"Config file not found: {config_path}")
-        
-        with open(config_path, "r") as f:
+        with open(config_path, "r") as f: 
             config = json.load(f)
-        
         overwatch.info(f"Loaded config from: {config_path}")
         return config
+    
+    def _create_vla_config(self, config_dict: Dict[str, Any]) -> VLAConfig:
+        """
+        Create VLAConfig instance from configuration dictionary.
+        
+        Args:
+            config_dict: Configuration dictionary loaded from config.json
+        
+        Returns:
+            VLAConfig instance with required fields populated
+        """
+        # Extract VLA config from the dict - handle nested or flat structures
+        vla_cfg_dict = config_dict["vla"]
+        
+        # Create VLAConfig with required and optional fields （从json加载，而不是通过vla_id加载。避免修改代码导致无法复现)
+        vla_cfg = VLAConfig(
+            vla_id=vla_cfg_dict.get("vla_id", "test_policy"),
+            base_vlm=vla_cfg_dict.get("base_vlm", "unknown"),
+            freeze_vision_backbone=vla_cfg_dict.get("freeze_vision_backbone", False),
+            freeze_llm_backbone=vla_cfg_dict.get("freeze_llm_backbone", False),
+            unfreeze_last_llm_layer=vla_cfg_dict.get("unfreeze_last_llm_layer", False),
+            shuffle_buffer_size=vla_cfg_dict.get("shuffle_buffer_size", 256_000),
+            global_batch_size=vla_cfg_dict.get("global_batch_size", 256),
+            per_device_batch_size=vla_cfg_dict.get("per_device_batch_size", 32),
+            learning_rate=vla_cfg_dict.get("learning_rate", 2e-5),
+            weight_decay=vla_cfg_dict.get("weight_decay", 0.0),
+            max_grad_norm=vla_cfg_dict.get("max_grad_norm", 1.0),
+            lr_scheduler_type=vla_cfg_dict.get("lr_scheduler_type", "constant"),
+            warmup_ratio=vla_cfg_dict.get("warmup_ratio", 0.0),
+            train_strategy=vla_cfg_dict.get("train_strategy", "fsdp-full-shard"),
+            enable_gradient_checkpointing=vla_cfg_dict.get("enable_gradient_checkpointing", True),
+            enable_mixed_precision_training=vla_cfg_dict.get("enable_mixed_precision_training", True),
+            reduce_in_full_precision=vla_cfg_dict.get("reduce_in_full_precision", True),
+            trajectory_converter_type=vla_cfg_dict.get("trajectory_converter_type", "value_textualize"),
+            trajectory_n_bins=vla_cfg_dict.get("trajectory_n_bins", 256),
+            trajectory_n_dims=vla_cfg_dict.get("trajectory_n_dims", 7),
+        )
+        
+        return vla_cfg
     
     @torch.no_grad()
     def select_action(self, observation: Dict[str, Any]) -> np.ndarray:
@@ -191,16 +214,12 @@ class OpenVLAPolicyWrapper:
     def from_pretrained(
         cls,
         checkpoint_path: str,
-        device: str = "cuda",
-        hf_token: Optional[str] = None,
     ) -> "OpenVLAPolicyWrapper":
         """
         Load policy from pretrained checkpoint (LeRobot-compatible interface).
         
         Args:
             checkpoint_path: Path to checkpoint file or run directory
-            device: Device to run on
-            hf_token: HuggingFace token
         
         Returns:
             Initialized policy wrapper
@@ -223,12 +242,7 @@ class OpenVLAPolicyWrapper:
             else:
                 raise FileNotFoundError(f"No checkpoints directory in {checkpoint_path}")
         
-        return cls(
-            checkpoint_path=checkpoint_path,
-            config_dict=None,  # Will auto-load
-            device=device,
-            hf_token=hf_token,
-        )
+        return cls(checkpoint_path=checkpoint_path)
     
     def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """
@@ -253,4 +267,4 @@ class OpenVLAPolicyWrapper:
         }
     
     def __repr__(self) -> str:
-        return f"OpenVLAPolicyWrapper(checkpoint={self.checkpoint_path.name}, device={self.device})"
+        return f"OpenVLAPolicyWrapper(checkpoint={self.checkpoint_path.name})"

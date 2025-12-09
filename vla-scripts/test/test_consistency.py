@@ -36,27 +36,26 @@ class TestModelConsistency(unittest.TestCase):
         """
         Set up test fixtures once for all tests.
         """
-        from test_utils import get_default_checkpoint_path
+        import gc
+        from test_utils import get_default_checkpoint_path, load_vla_config_from_checkpoint
         
         # Get default checkpoint path (will assert if not found)
         cls.checkpoint_path = Path(get_default_checkpoint_path())
         print(f"\n[TestSetup] Using checkpoint: {cls.checkpoint_path}")
         
-        # Load original VLA
-        print("[TestSetup] Loading original VLA model...")
-        cls.original_vla = load(
-            str(cls.checkpoint_path),
-            hf_token=os.environ.get("HF_TOKEN"),
-            load_for_training=False,
-        )
-        cls.original_vla.eval()
+        # Load VLAConfig from checkpoint
+        print("[TestSetup] Loading VLAConfig from checkpoint...")
+        cls.vla_cfg = load_vla_config_from_checkpoint(str(cls.checkpoint_path))
         
-        # Load wrapped VLA
+        # Load wrapped VLA first (this loads the model once)
         print("[TestSetup] Loading wrapped VLA model...")
-        cls.wrapped_vla = OpenVLAPolicyWrapper.from_pretrained(
-            str(cls.checkpoint_path),
-            hf_token=os.environ.get("HF_TOKEN"),
-        )
+        cls.wrapped_vla = OpenVLAPolicyWrapper.from_pretrained(str(cls.checkpoint_path))
+        
+        # Use the same underlying model for "original" tests to avoid loading twice
+        # This is valid because wrapped_vla.vla IS the OpenVLA model instance
+        print("[TestSetup] Sharing model instance for original VLA...")
+        cls.original_vla = cls.wrapped_vla.vla
+        cls.original_vla.eval()
         
         # Create test samples
         print("[TestSetup] Creating test samples...")

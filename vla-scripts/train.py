@@ -11,8 +11,8 @@ Run with:
     - [Single Node Multi-GPU (= $K)]: torchrun --standalone --nnodes 1 --nproc-per-node $K vla-scripts/train.py
 """
 
-import json
 import os
+import json
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -162,8 +162,6 @@ class RunConfig:
     epochs: int = 100                                           # Epochs to Run (in case max_steps is not specified)
     max_steps: Optional[int] = None                             # [Optional] Max Gradient Steps to Run (overrides epochs)
     
-    # === HF Hub Credentials ===
-    hf_token: Union[str, Path] = Path(".hf_token")              # Path to HF Token
     # === Trackio Project Configuration ===
     project: str = "vla-training"                               # Trackio project name
     
@@ -201,7 +199,6 @@ def train(cfg: RunConfig) -> None:
 
     # Start =>> Build Directories and Set Randomness
     overwatch.info('"Do or do not; there is no try."', ctx_level=1)
-    hf_token = cfg.hf_token.read_text().strip() if isinstance(cfg.hf_token, Path) else os.environ[cfg.hf_token]
     worker_init_fn = set_global_seed(cfg.seed, get_worker_init_fn=True)
     os.makedirs(run_dir := (cfg.run_root_dir / cfg.run_id), exist_ok=True)
     os.makedirs(cfg.run_root_dir / cfg.run_id / "checkpoints", exist_ok=True)
@@ -227,12 +224,12 @@ def train(cfg: RunConfig) -> None:
     if checkpoint_to_load is not None:
         if cfg.mode.is_resume:
             print("[*] Loading VLA from Pretrained Checkpoint:", checkpoint_to_load)
-            vla = load(checkpoint_to_load, hf_token=hf_token, load_for_training=True)
+            vla = load(cfg.vla, checkpoint_to_load, load_for_training=True)
         elif cfg.mode.is_test:
             print("[*] Loading VLA from Checkpoint for Validate/Test:", cfg.mode.validate_checkpoint_path)
-            vla = load(cfg.mode.validate_checkpoint_path, hf_token=hf_token, load_for_training=False)
+            vla = load(cfg.vla, load_for_training=False)
     else:
-        vla = load(cfg.vla.base_vlm, hf_token=hf_token, load_for_training=True)
+        vla = load(cfg.vla, load_for_training=True)
 
     # [Validate] Model should be in Full Precision!
     for param in vla.parameters():

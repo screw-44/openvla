@@ -36,6 +36,10 @@ IGNORE_INDEX = -100
 
 
 class PrismaticVLM(VLM):
+    # Required for transformers 4.35+ generate() method compatibility
+    # Indicates model doesn't use stateful caches (e.g., Mamba models do)
+    _is_stateful = False
+
     def __init__(
         self,
         model_id: str,
