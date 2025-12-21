@@ -1,9 +1,38 @@
 import re
+import os
+import torch
+import torch.distributed as dist
 from pathlib import Path
 from typing import Optional, Tuple
 
 from prismatic.overwatch.overwatch import initialize_overwatch
 overwatch = initialize_overwatch(__name__)
+
+def warmup_trainig() -> int:
+    # Sane Defaults
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+    # --- 分布式训练奇怪的设定 ---
+    # 强制根据 Local Rank 设置当前进程可见的 GPU
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    torch.cuda.set_device(local_rank)
+
+    # [Fix for NCCL Error] Explicitly initialize process group with device_id
+    # This prevents "using GPU X as device used by this process is currently unknown"
+    if not dist.is_initialized():
+        dist.init_process_group(
+            backend="nccl",
+            init_method="env://",
+            device_id=torch.device(f"cuda:{local_rank}")
+        )
+    os.environ["NCCL_DEBUG"] = "ERROR"
+
+    # 屏蔽trackio的输出
+    import logging
+    logging.getLogger("trackio").setLevel(logging.ERROR)
+
+    return local_rank
+
 
 # === Utility Function: Extract Step and Epoch from Checkpoint Path ===
 def extract_step_epoch_from_checkpoint(checkpoint_path: Optional[Path]) -> Tuple[int, int]:

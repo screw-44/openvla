@@ -22,7 +22,6 @@ from prismatic.overwatch import initialize_overwatch
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
 
-
 class VLAMetrics:
     def __init__(
         self,

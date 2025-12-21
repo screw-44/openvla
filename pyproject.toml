@@ -19,4 +19,4 @@ dependencies = [
 vla = "hf_wrapper"
 
 [tool.setuptools.packages.find]
-include = ["hf_wrapper*", "prismatic*"]
+include = ["hf_wrapper*", "prismatic*", "utils*"]
