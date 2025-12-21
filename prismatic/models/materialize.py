@@ -10,6 +10,8 @@ from typing import Optional, Tuple
 from transformers import PreTrainedTokenizerBase
 
 from prismatic.models.backbones.llm import LLaMa2LLMBackbone, LLMBackbone, MistralLLMBackbone, PhiLLMBackbone
+from prismatic.models.backbones.llm.qwen3_vl import Qwen3VLBackbone
+from prismatic.models.backbones.llm.distilgpt2 import DistilGPT2Backbone
 from prismatic.models.backbones.vision import (
     CLIPViTBackbone,
     DinoCLIPViTBackbone,
@@ -70,6 +72,14 @@ LLM_BACKBONES = {
 
     # === Phi-2 Backbone ===
     "phi-2-3b": {"cls": PhiLLMBackbone, "kwargs": {}},
+
+    # === Qwen3-VL Unified Multimodal Backbones ===
+    "qwen3-vl-2b-instruct": {"cls": Qwen3VLBackbone, "kwargs": {"model_size": "2B"}},
+    "qwen3-vl-7b-instruct": {"cls": Qwen3VLBackbone, "kwargs": {"model_size": "7B"}},
+    "qwen3-vl-4b-instruct": {"cls": Qwen3VLBackbone, "kwargs": {"model_size": "4B"}},
+
+    # === Lightweight Debugging Backbone (Few Hundred MB) ===
+    "distilgpt2": {"cls": DistilGPT2Backbone, "kwargs": {}},
 }
 
 # fmt: on

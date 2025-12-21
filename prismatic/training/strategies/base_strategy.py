@@ -54,7 +54,6 @@ class RunStrategy(ABC):
         reduce_in_full_precision: bool = False,
         mixed_precision_dtype: torch.dtype = torch.bfloat16,
         worker_init_fn: Optional[Callable[[int], None]] = None,
-        **_: str,
     ) -> None:
         self.vla, self.device_id, self.stage = vla, device_id, stage
 
@@ -81,10 +80,9 @@ class RunStrategy(ABC):
         # Optimizers & Scheduler (initialized in `run_setup`)
         self.optimizer, self.lr_scheduler = None, None
 
-        # Lightweight Validation
-        assert (
-            self.global_batch_size % self.per_device_batch_size == 0
-        ), "Per-device batch size must evenly divide global batch size!"
+        # Validation
+        assert (self.global_batch_size % self.per_device_batch_size == 0), "Per-device batch size must evenly divide global batch size!"
+        
         self.grad_accumulation_steps = self.global_batch_size // self.per_device_batch_size // overwatch.world_size()
         if self.enable_mixed_precision_training:
             assert self.mixed_precision_dtype == torch.bfloat16, "Only BF16 mixed precision training is supported!"
@@ -111,220 +109,32 @@ class RunStrategy(ABC):
     def train_vla(
         self,
         vla_dataset: Dataset,
-        collator: PaddedCollatorForActionPrediction, # TODO: 看一下是否兼容
+        collator: PaddedCollatorForActionPrediction,
         metrics: VLAMetrics,
         run_dir: Path,
         save_interval: int = 2500,
         save_full_model: bool = True,
         mode_config: Optional[ModeConfig] = None,
-        epochs: int = 10,
-        max_steps: Optional[int] = None,
     ) -> None:
-        """Run the VLA training loop for the given `dataset` and `collator`; log losses, action metrics to `metrics`.
+        """
+        运行VLA训练循环
         
         Args:
-            vla_dataset: Training dataset
-            collator: Data collator for batching
-            metrics: Metrics tracker
-            run_dir: Directory path for saving checkpoints
-            save_interval: Interval (in steps) for saving checkpoints
-            save_full_model: Whether to save the full model or just trainable params
-            mode_config: Optional mode configuration for validation during training
-            epochs: Maximum number of epochs to train (default: 1000)
-            max_steps: Maximum number of gradient steps to train (overrides epochs if set)
+            vla_dataset: 训练数据集
+            collator: 批处理数据整理器
+            metrics: 指标追踪器
+            run_dir: 检查点保存目录
+            save_interval: 检查点保存间隔（步数）
+            save_full_model: 是否保存完整模型（否则只保存可训练参数）
+            mode_config: 可选的验证模式配置
+            max_steps: 最大训练步数（设置后将覆盖epochs限制）
         """
-        assert self.grad_accumulation_steps == 1, "VLA training does not support gradient accumulation!"
+        assert self.grad_accumulation_steps == 1, "VLA训练不支持梯度累积！"
         
-        # Determine training limits
-        # If max_steps is set, use it; otherwise use epochs
-        use_max_steps = max_steps is not None
-        target_epochs = epochs if not use_max_steps else float('inf')  # Infinite epochs if using max_steps
-        target_max_steps = max_steps if use_max_steps else None
-        
-        overwatch.info(f"Training Configuration:")
-        if use_max_steps:
-            overwatch.info(f"  - Max Steps: {target_max_steps} (training will stop when reaching this step count)")
-        else:
-            overwatch.info(f"  - Epochs: {target_epochs} (training will stop after {target_epochs} epochs)")
-        
-        # 设置拿到train的数据
+        # 设置数据集为训练模式
         vla_dataset.get_train_data = True
-        # Create a DataLoader with multi-worker data loading for efficiency
-        dataloader = DataLoader(
-            vla_dataset,
-            batch_size=self.per_device_batch_size,
-            sampler=None,
-            collate_fn=collator,
-            num_workers=DATA_LOADER_NUM_WORKERS,  # 简单设置，后续可以调优
-            worker_init_fn=self.worker_init_fn,
-            shuffle=True,
-            pin_memory=True,
-            persistent_workers=True,
-        )
-
-        # === Train ===
-        status = metrics.get_status()
         
-        # Use parameterized epochs instead of self.epochs
-        max_epochs = target_epochs if target_epochs != float('inf') else 999999  # Large number for display
-        epoch_progress = tqdm(
-            range(int(max_epochs)), desc=f"Epochs", leave=True, disable=not overwatch.is_rank_zero(), position=0
-        )
-        for epoch in epoch_progress:
-            self.vla.train()
-            # Zero Gradients (just in case)
-            self.optimizer.zero_grad()
-
-            # Inner progress bar for steps within each epoch
-            step_progress = tqdm(
-                enumerate(dataloader), desc=f"Epoch {epoch+1}/{max_epochs} - {status}",
-                leave=False, disable=not overwatch.is_rank_zero(), total=len(dataloader), position=1
-            )
-            # TODO： 输入input_ids openvla的原来是给random数值进来的。逆天。
-            for train_idx, batch in step_progress:
-                # Note that we'll unpack batch (and let AMP/FSDP do its thing) in the VLM.forward() call
-                #   => Basically, if we're using mixed precision (or not), autocast()/FSDP will move to device!
-                with torch.autocast(
-                    "cuda", dtype=self.mixed_precision_dtype, enabled=self.enable_mixed_precision_training
-                ):
-                    
-                    print("input_ids:", batch["input_ids"])
-                    exit()
-                    # [Contract] self.vlm.forward() must automatically compute `loss` and return!
-                    output: CausalLMOutputWithPast = self.vla(
-                        input_ids=batch["input_ids"],
-                        attention_mask=batch["attention_mask"],
-                        pixel_values=batch["pixel_values"],
-                        labels=batch["labels"],
-                    )
-                    loss = output.loss
-
-                # Commit Loss =>> Backward!
-                metrics.commit(loss=loss)
-                loss.backward()
-
-                # === Compute Action Token Accuracy & L1 Loss ===
-
-                # To compute action token accuracy, we need to identify the locations of the action tokens
-                # in both `output.logits` and `batch["labels"]`. We know that when "right" padding, we
-                # insert `self.vlm.vision_backbone.num_patches` at index 1.
-                #
-                # Computing `action_prediction_accuracy` is then pretty straightforward:
-                #   1) Extract "aligned" predictions & labels
-                #   2) Compute boolean "mask" where "labels > 2" (where 2 is ID for `EOS_TOKEN`)
-                #           => If masking out EOS, then it's just "labels != -100 (IGNORE_INDEX)
-                #   3) Compute masked accuracy as `(pred == logits) & mask` --> sum/divide by # unmasked!
-                pred = output.logits[:, self.vla.vision_backbone.num_patches : -1].argmax(dim=2)
-                gt = batch["labels"][:, 1:].to(pred.device)
-                mask = gt > self.vla.trajectory_converter.trajectory_token_begin_idx
-                # print("pred length:", len(pred), ". gt length:", len(gt))
-                # print("mask", mask)
-                # print("pred", pred)
-                # exit()
-
-                # Compute Accuracy
-                pred = (pred == gt) & mask
-                action_accuracy = pred.sum().float() / mask.sum().float()
-
-                # Compute L1 Loss on Predicted (Continuous) Actions
-                continuous_pred = torch.tensor(
-                    self.vla.trajectory_converter.decode_text_ids_to_trajectory(pred[mask].cpu().numpy())
-                )
-                continuous_gt = torch.tensor(
-                    self.vla.trajectory_converter.decode_text_ids_to_trajectory(gt[mask].cpu().numpy())
-                )
-                # print(f"continous_actions_pred - continous_actions_gt [0:5]: {continuous_pred[0:5] - continuous_gt[0:5]}")
-
-                action_l1_loss = torch.nn.functional.l1_loss(continuous_pred, continuous_gt)
-                # Commit Metrics
-                metrics.commit(action_accuracy=action_accuracy, l1_loss=action_l1_loss, update_step_time=True)
-
-                # === Gradient Step ===
-
-                # Clip Gradients --> this is custom, per-strategy because of DDP vs. FSDP locality assumptions
-                self.clip_grad_norm()
-
-                # Optimizer & LR Scheduler Step
-                self.optimizer.step()
-                self.lr_scheduler.step()
-                self.optimizer.zero_grad()
-
-                # Push Metrics
-                metrics.commit(global_step=metrics.global_step + 1, epoch=epoch, lr=self.lr_scheduler.get_last_lr()[0])
-                status = metrics.push()
-
-                # Save model based on cfg.save_interval
-                if (metrics.global_step + 1) % save_interval == 0:
-                    self.save_checkpoint(
-                        run_dir, metrics.global_step, epoch, loss.item(), only_trainable=not save_full_model
-                    )
-                    dist.barrier()
-
-                # Do Validation if specified
-                if mode_config is not None and mode_config.is_validate:
-                    if metrics.global_step % mode_config.validate_interval == 0:
-                        overwatch.info(f"Running Validation at Step {metrics.global_step}...")
-                        self.validate_vla(
-                            vla_dataset,
-                            collator,
-                            metrics,
-                            mode_config=mode_config,
-                        )
-                        overwatch.info("Done with Validation.")
-
-                # Update step Progress Bars
-                step_progress.set_description(f"Epoch {epoch+1}/{max_epochs} - {status}")
-                
-                # Check if we've reached max_steps limit
-                if target_max_steps is not None and metrics.global_step >= target_max_steps:
-                    overwatch.info(f"Reached max_steps limit ({target_max_steps}). Saving final checkpoint and exiting...")
-                    
-                    # Save final checkpoint before exit
-                    self.save_checkpoint(
-                        run_dir, metrics.global_step, epoch, loss.item(), only_trainable=not save_full_model
-                    )
-                    dist.barrier()
-                    
-                    overwatch.info(f"Training completed at step {metrics.global_step}")
-                    return  # Exit the training function
-
-            # (Epoch级别暂时没有记录) Update epoch progress bar after finishing all steps in this epoch
-            epoch_progress.set_description(f"Epochs - {status}")
-            
-            # Check if we've reached epochs limit (if not using max_steps mode)
-            if not use_max_steps and (epoch + 1) >= target_epochs:
-                overwatch.info(f"Completed all {target_epochs} epochs. Saving final checkpoint...")
-                
-                # Save final checkpoint
-                self.save_checkpoint(
-                    run_dir, metrics.global_step, epoch, loss.item(), only_trainable=not save_full_model
-                )
-                dist.barrier()
-                
-                overwatch.info(f"Training completed after {target_epochs} epochs")
-                return  # Exit the training function
-
-    # === VLA Testing ===
-
-    def validate_vla(
-        self,
-        vla_dataset: Dataset,
-        collator: PaddedCollatorForActionPrediction,
-        metrics: "VLAMetrics",
-        mode_config: ModeConfig,
-    ) -> None:
-        """Run the VLA validation loop for the given `dataset` and `collator`; log losses, action metrics to trackio.        """
-        # 设置拿到test的数据
-        vla_dataset.get_train_data = False
-
-        # Initialize data collection for trackio logging
-        all_losses = []
-        all_action_accuracies = []
-        sample_predictions = []
-        sample_gts = []
-        max_samples = 4  # Only collect 4 samples for the table
-
-        # 注意shuffle是开的
+        # 创建数据加载器（使用多worker并行加载提升效率）
         dataloader = DataLoader(
             vla_dataset,
             batch_size=self.per_device_batch_size,
@@ -337,94 +147,204 @@ class RunStrategy(ABC):
             persistent_workers=True,
         )
 
-        # === Testing ===
-        self.vla.eval()
-        
-        # Validation loop: iterate over epochs and batches
-        total_batches_processed = 0
-        for epoch in range(1):  # 只验证第一个epoch
-            epoch_progress = tqdm(
-                enumerate(dataloader), 
-                desc=f"Validation Epoch {epoch+1}",
-                total=min(mode_config.validate_data_length, len(vla_dataset) // self.per_device_batch_size),
-                disable=not overwatch.is_rank_zero()
+        # === 开始训练 ===
+        self.vla.train()
+        for epoch in range(self.epochs):
+            # 内层进度条显示当前轮的训练进度
+            step_progress = tqdm(
+                dataloader, 
+                desc=f"Epoch {epoch+1}/{self.epochs}",
+                disable=not overwatch.is_rank_zero(), 
+                initial=metrics.global_step % len(dataloader), # resume后的起始
             )
-
-            for batch_idx, batch in epoch_progress:
-                # 手动控制测试长度
-                if total_batches_processed >= mode_config.validate_data_length:
-                    break
-                
-                total_batches_processed += 1
-                
-                # Note that we'll unpack batch (and let AMP/FSDP do its thing) in the VLM.forward() call
-                #   => Basically, if we're using mixed precision (or not), autocast()/FSDP will move to device!
+            for batch in step_progress:
+                metrics.global_step += 1
                 with torch.autocast(
                     "cuda", dtype=self.mixed_precision_dtype, enabled=self.enable_mixed_precision_training
                 ):
-                    # [Contract] self.vlm.forward() must automatically compute `loss` and return!
                     output: CausalLMOutputWithPast = self.vla(
                         input_ids=batch["input_ids"],
                         attention_mask=batch["attention_mask"],
                         pixel_values=batch["pixel_values"],
                         labels=batch["labels"],
                     )
+                    loss = output.loss
+                loss.backward() # 反向传播
 
-                # === Compute Action Token Accuracy & L1 Loss ===
-                # To compute action token accuracy, we need to identify the locations of the action tokens
-                # in both `output.logits` and `batch["labels"]`. We know that when "right" padding, we
-                # insert `self.vlm.vision_backbone.num_patches` at index 1.
-                #
-                # Computing `action_prediction_accuracy` is then pretty straightforward:
-                #   1) Extract "aligned" predictions & labels
-                #   2) Compute boolean "mask" where "labels > 2" (where 2 is ID for `EOS_TOKEN`)
-                #           => If masking out EOS, then it's just "labels != -100 (IGNORE_INDEX)
-                #   3) Compute masked accuracy as `(pred == logits) & mask` --> sum/divide by # unmasked!
-                action_preds = output.logits[:, self.vla.vision_backbone.num_patches : -1].argmax(dim=2)
-                gt = batch["labels"][:, 1:].to(action_preds.device)
-                mask = gt > self.vla.trajectory_converter.trajectory_token_begin_idx
-
-                # Compute Accuracy
-                pred = (action_preds == gt) & mask
-                action_accuracy = pred.sum().float() / mask.sum().float()
-
-                # Compute L1 Loss on Predicted (Continuous) Actions
-                continuous_pred = torch.tensor(
-                    self.vla.trajectory_converter.decode_text_ids_to_trajectory(action_preds[mask].cpu().numpy())
-                )
-                continuous_gt = torch.tensor(
-                    self.vla.trajectory_converter.decode_text_ids_to_trajectory(gt[mask].cpu().numpy())
-                )
-                
-                # Collect metrics for trackio logging (only on rank 0)
+                # === 计算动作预测准确率和L1损失 ===
+                # 使用metrics.log_pro()计算所有指标（处理变长序列和per-sample L1损失）
                 if overwatch.is_rank_zero():
-                    all_losses.append(output.loss.item())
-                    all_action_accuracies.append(action_accuracy.item())
-                    
-                    # Collect sample predictions and ground truth (only first 4)
-                    if len(sample_predictions) < max_samples:
-                        sample_predictions.append(continuous_pred.cpu().numpy().tolist())
-                        sample_gts.append(continuous_gt.cpu().numpy().tolist())
+                    with torch.no_grad():
+                        metrics.log_pro(output, batch, self.vla, self.lr_scheduler.get_last_lr()[0])
+    
+                # === 梯度更新 ===
+                self.clip_grad_norm()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                self.lr_scheduler.step()
 
-        # === Log validation metrics to trackio (only on rank 0) ===
+                step_progress.set_description(
+                    f"[Epoch {epoch}] G_Step {metrics.global_step} | Lr:{self.lr_scheduler.get_last_lr()[0]:.6f} | Loss:{loss.item():.4f}"
+                )
+                # 定期保存检查点
+                if metrics.global_step % save_interval == 0:
+                    overwatch.info(f"保存checkpoint在{metrics.global_step}")
+                    self.save_checkpoint(
+                        run_dir, metrics.global_step, epoch, loss.item(), only_trainable=not save_full_model
+                    )
+                    dist.barrier()
+
+                # 定期运行验证（在global_step更新后检查）
+                # if mode_config is not None and mode_config.has_validate:
+                #     if metrics.global_step % mode_config.validate_interval == 0:
+                #         overwatch.info(f"在步数 {metrics.global_step} 处运行验证...")
+                #         self.validate_vla(vla_dataset, collator, metrics, mode_config=mode_config)
+                #          # 验证后恢复训练模式
+                #         self.vla.train()
+                #         overwatch.info("验证完成，恢复训练模式。")
+
+                if self.max_steps is not None and metrics.global_step >= self.max_steps: # 如果这个参数没有设置，就不用比较
+                    overwatch.info(f"max steps已经达到，完成训练。 保存最终检查点中")
+                    self.save_checkpoint(
+                        run_dir, metrics.global_step, epoch, loss.item(), only_trainable=not save_full_model
+                    )
+                    dist.barrier()
+                    return
+
+        overwatch.info(f"完成全部 {self.epochs} 轮训练。保存最终检查点...")
+        self.save_checkpoint(
+            run_dir, metrics.global_step, epoch, loss.item(), only_trainable=not save_full_model
+        )
+        dist.barrier()
+        return
+
+    # === VLA validate ===
+
+    def validate_vla(
+        self,
+        vla_dataset: Dataset,
+        collator: PaddedCollatorForActionPrediction,
+        metrics: "VLAMetrics",
+        mode_config: ModeConfig,
+    ) -> None:
+        """
+        运行VLA验证循环，记录损失和动作指标到trackio
+        """
+        # 设置数据集为验证模式
+        vla_dataset.get_train_data = False
+
+        # 初始化数据收集容器
+        all_losses = []
+        all_action_accuracies = []
+        sample_predictions = []
+        sample_gts = []
+        max_samples = 4
+
+        # 创建验证数据加载器
+        dataloader = DataLoader(
+            vla_dataset,
+            batch_size=self.per_device_batch_size,
+            sampler=None,
+            collate_fn=collator,
+            num_workers=DATA_LOADER_NUM_WORKERS,
+            worker_init_fn=self.worker_init_fn,
+            shuffle=True,
+            pin_memory=True,
+            persistent_workers=True,
+        )
+
+        # === 验证循环 ===
+        self.vla.eval()
+        
+        total_batches_processed = 0
+        max_batches = min(mode_config.validate_data_length, len(vla_dataset) // self.per_device_batch_size)
+        
+        progress_bar = tqdm(
+            enumerate(dataloader), 
+            desc=f"验证中",
+            total=max_batches,
+            disable=not overwatch.is_rank_zero()
+        )
+
+        for batch_idx, batch in progress_bar:
+            if total_batches_processed >= mode_config.validate_data_length:
+                break
+            
+            total_batches_processed += 1
+            
+            # 前向传播（验证时不需要梯度）
+            with torch.no_grad(), torch.autocast(
+                "cuda", dtype=self.mixed_precision_dtype, enabled=self.enable_mixed_precision_training
+            ):
+                output: CausalLMOutputWithPast = self.vla(
+                    input_ids=batch["input_ids"],
+                    attention_mask=batch["attention_mask"],
+                    pixel_values=batch["pixel_values"],
+                    labels=batch["labels"],
+                )
+
+            
+            metric_dict = metrics.log_pro(output, batch, self.vla, global_step=0)
+            action_accuracy = metric_dict['action_accuracy']
+            
+            # 收集指标（仅在rank 0）
+            if overwatch.is_rank_zero():
+                all_losses.append(output.loss.item())
+                all_action_accuracies.append(action_accuracy.item())
+                
+                # 解码并收集样本（用于可视化）
+                # 重新计算mask和preds用于样本收集
+                IGNORE_INDEX = -100
+                action_mask = (batch["labels"] != IGNORE_INDEX)
+                starts = action_mask.float().argmax(dim=1)
+                min_start = int(starts.min().item()) if action_mask.any() else 0
+                
+                if batch["labels"].size(1) > min_start:
+                    action_logits = output.logits[:, min_start:, :]
+                    action_preds = action_logits.argmax(dim=2)
+                    gt = batch["labels"][:, min_start:]
+                    
+                    # 对齐长度
+                    if action_preds.size(1) != gt.size(1):
+                        min_len = min(action_preds.size(1), gt.size(1))
+                        action_preds = action_preds[:, :min_len]
+                        gt = gt[:, :min_len]
+                    
+                    mask = gt > self.vla.trajectory_converter.trajectory_token_begin_idx
+                    
+                    # 收集样本
+                    batch_size = action_preds.shape[0]
+                    for sample_idx in range(batch_size):
+                        if len(sample_predictions) >= max_samples:
+                            break
+                        
+                        sample_pred_ids = action_preds[sample_idx][mask[sample_idx]].cpu().numpy()
+                        sample_gt_ids = gt[sample_idx][mask[sample_idx]].cpu().numpy()
+                        
+                        try:
+                            continuous_pred = self.vla.trajectory_converter.decode_text_ids_to_trajectory(sample_pred_ids)
+                            continuous_gt = self.vla.trajectory_converter.decode_text_ids_to_trajectory(sample_gt_ids)
+                            sample_predictions.append(continuous_pred.tolist())
+                            sample_gts.append(continuous_gt.tolist())
+                        except Exception as e:
+                            overwatch.warning(f"批次{batch_idx}样本{sample_idx}解码失败: {e}")
+
+
+        # === 记录验证指标到trackio（仅在rank 0） ===
         if overwatch.is_rank_zero() and len(all_losses) > 0:
-            # Compute average metrics 注意要转换到python类型
+            # 计算平均指标
             avg_loss = torch.tensor(all_losses).mean().item()
             avg_accuracy = torch.tensor(all_action_accuracies).mean().item()
             
-            # Collect L1 errors for each sample
-            l1_errors = []
-            for i in range(len(sample_predictions)):
-                l1_error = float(np.abs(np.array(sample_predictions[i]) - np.array(sample_gts[i])).mean())
-                l1_errors.append(l1_error)
+            # 计算每个样本的L1误差（需要处理变长轨迹）
+            l1_errors = self._compute_sample_l1_errors(sample_predictions, sample_gts)
             
-            # Use VLAMetrics to collect and log validation samples with table
-            # This ensures proper experiment isolation when running multiple instances
+            # 记录验证样本和表格到trackio
             metrics.log_validation_samples(
                 predictions=sample_predictions,
                 ground_truths=sample_gts,
                 max_samples=len(sample_predictions),
-                dataset_name=None,  # Can specify dataset name for multi-dataset scenarios
+                dataset_name=None,
             )
             
             metrics.log_validation_table(
@@ -434,7 +354,47 @@ class RunStrategy(ABC):
                 dataset_name=None,
             )
             
-            overwatch.info(f"✅ Validation metrics logged to trackio at step {metrics.global_step}")
-            overwatch.info(f"   - Loss: {avg_loss:.4f}")
-            overwatch.info(f"   - Action accuracy: {avg_accuracy:.4f}")
-            overwatch.info(f"   - Logged {len(sample_predictions)} prediction samples")
+            overwatch.info(f"✅ 验证指标已记录到trackio（步数 {metrics.global_step}）")
+            overwatch.info(f"   - 损失: {avg_loss:.4f}")
+            overwatch.info(f"   - 动作准确率: {avg_accuracy:.4f}")
+            overwatch.info(f"   - 记录了 {len(sample_predictions)} 个预测样本")
+    
+    def _compute_sample_l1_errors(self, predictions, ground_truths):
+        """
+        计算样本的L1误差列表（处理变长轨迹）
+        
+        Args:
+            predictions: 预测轨迹列表
+            ground_truths: 真实轨迹列表
+        
+        Returns:
+            L1误差列表
+        """
+        l1_errors = []
+        for i in range(len(predictions)):
+            try:
+                pred_array = np.array(predictions[i])
+                gt_array = np.array(ground_truths[i])
+                
+                # 确保至少是1维
+                if pred_array.ndim == 0:
+                    pred_array = np.array([pred_array])
+                if gt_array.ndim == 0:
+                    gt_array = np.array([gt_array])
+                
+                # 获取长度
+                pred_len = pred_array.shape[0] if pred_array.ndim > 1 else len(pred_array)
+                gt_len = gt_array.shape[0] if gt_array.ndim > 1 else len(gt_array)
+                
+                # 取最小长度进行比较（因为EOS可能导致长度不同）
+                min_len = min(pred_len, gt_len)
+                if min_len > 0:
+                    l1_error = float(np.abs(pred_array[:min_len] - gt_array[:min_len]).mean())
+                else:
+                    l1_error = 0.0
+                l1_errors.append(l1_error)
+            except Exception as e:
+                overwatch.warning(f"计算样本 {i} 的L1误差失败: {e}")
+                l1_errors.append(0.0)
+        
+        return l1_errors

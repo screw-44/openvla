@@ -69,131 +69,105 @@ class VLAConfig(ChoiceRegistry):
             self.global_batch_size = self.per_device_batch_size * num_gpus
 
 
-# === OpenVLA Training Configurations ===
-
-
-# = [8 GPU] Fast Iteration =>> SigLIP 224px + Bridge =
-@dataclass
-class Exp_SigLIP_224px_Bridge(VLAConfig):
-    vla_id: str = "siglip-224px+mx-bridge"
-    base_vlm: Union[str, Path] = "siglip-224px+7b"
-
-    freeze_vision_backbone: bool = False
-    freeze_llm_backbone: bool = False
-    unfreeze_last_llm_layer: bool = False
-
-    # Data Mixture Parameters
-    data_mix: str = "bridge"
-    shuffle_buffer_size: int = 256_000
-
-    # Optimization Parameters (epochs and max_steps now in RunConfig)
-    global_batch_size: int = 256
-    per_device_batch_size: int = 32
-
-    learning_rate: float = 2e-5
-    weight_decay: float = 0.0
-    max_grad_norm: float = 1.0
-    lr_scheduler_type: str = "constant"
-    warmup_ratio: float = 0.0
-
-    train_strategy: str = "fsdp-full-shard"
-
-
-# = [8 GPU] SigLIP 224px Frozen Vision Backbone + Bridge =
-@dataclass
-class Exp_FreezeVIT_SigLIP_224px_Bridge(Exp_SigLIP_224px_Bridge):
-    vla_id: str = "siglip-224px-icy+mx-bridge"
-    base_vlm: Union[str, Path] = "siglip-224px+7b"
-    freeze_vision_backbone: bool = True
-
-
-# = [8 GPU] Fast Iteration =>> DINO-SigLIP 224px + Bridge =
-@dataclass
-class Exp_DinoSigLIP_224px_Bridge(Exp_SigLIP_224px_Bridge):
-    vla_id: str = "prism-dinosiglip-224px+mx-bridge"
-    base_vlm: Union[str, Path] = "prism-dinosiglip-224px+7b"
-
-    data_mix: str = "bridge"
-
-
-# = [64 GPU] SigLIP 224px + OXE Magic Soup =
-@dataclass
-class Exp_SigLIP_224px_OXE_Magic_Soup(Exp_SigLIP_224px_Bridge):
-    vla_id: str = "siglip-224px+mx-oxe-magic-soup"
-    base_vlm: Union[str, Path] = "siglip-224px+7b"
-
-    data_mix: str = "oxe_magic_soup"
-
-    global_batch_size: int = 2048
-    per_device_batch_size: int = 32
-
-
-# = [64 GPU] DINO-SigLIP 224px + OXE Magic Soup++ =
-@dataclass
-class Exp_DinoSigLIP_224px_OXE_Magic_Soup_Plus(Exp_SigLIP_224px_Bridge):
-    vla_id: str = "prism-dinosiglip-224px+mx-oxe-magic-soup-plus"
-    base_vlm: Union[str, Path] = "prism-dinosiglip-224px+7b"
-
-    # Note =>> We adopt two stages, training on a mixture including DROID for 70% of training, before resampling!
-    # data_mix: str = "oxe_magic_soup_plus"
-    data_mix: str = "oxe_magic_soup_plus_minus"
-
-    global_batch_size: int = 2048
-    per_device_batch_size: int = 32
-
 # === [1 GPU] Lightweight Custom Trajectory Training ===
 @dataclass
 class Base(VLAConfig):
     vla_id: str = "base"
     base_vlm: Union[str, Path] = "TRI-ML/prismatic-vlms/siglip-224px+7b"
 
-    freeze_vision_backbone: bool = False
-    freeze_llm_backbone: bool = False  
+    freeze_vision_backbone: bool = True
+    freeze_llm_backbone: bool = False
     unfreeze_last_llm_layer: bool = False
-    shuffle_buffer_size: int = 256_000 # Smaller buffer for lightweight training
+    shuffle_buffer_size: int = 256_000  # Smaller buffer for lightweight training
 
     # H100 Settings
     # Note: global_batch_size = -1 means auto-compute: per_device_batch_size * number_of_gpus
     global_batch_size: int = -1  # Auto-computed in __post_init__
     per_device_batch_size: int = 32
 
-    learning_rate: float = 5e-5   # Slightly higher LR for faster convergence
-    weight_decay: float = 0.01    # Add some regularization
-    max_grad_norm: float = 1.0
+    learning_rate: float = 5e-4  # Slightly higher LR for faster convergence
+    weight_decay: float = 0.001  # Add some regularization
+    max_grad_norm: float = 2.0
     lr_scheduler_type: str = "linear-warmup+cosine-decay"
-    warmup_ratio: float = 0.1 # 0.0001     # 0.01% warmup
+    warmup_ratio: float = 0.01  # 0.0001     # 0.01% warmup
 
     train_strategy: str = "fsdp-full-shard"
-    
+
     use_flash_attention_2: bool = True
     enable_mixed_precision_training: bool = True
+
 
 @dataclass
 class Base_4090(Base):
     vla_id: str = "base_4090"
-    
+
     freeze_vision_backbone: bool = True
-    freeze_llm_backbone: bool = True  
+    freeze_llm_backbone: bool = True
     unfreeze_last_llm_layer: bool = True
 
     per_device_batch_size: int = 1
 
+
+# === Debug Models for Fast Iteration ===
+@dataclass
+class DistilGPT2(Base):
+    vla_id: str = "distilgpt2"
+    base_vlm: Union[str, Path] = "distilgpt2"
+
+    freeze_vision_backbone: bool = True
+    freeze_llm_backbone: bool = False
+    unfreeze_last_llm_layer: bool = True
+
+    learning_rate: float = 5e-4  # Slightly higher LR for faster convergence
+    warmup_ratio: float = 0.01  # 0.01% warmup
+    weight_decay: float = 0.001
+    # Very small batch for quick testing
+    per_device_batch_size: int = 64
+    global_batch_size: int = -1  # Auto-compute
+
+
+# === Qwen3-VL Models ===
+@dataclass
+class Qwen3VL_2B(Base):
+    vla_id: str = "qwen3-vl-2b"
+    base_vlm: Union[str, Path] = "qwen3-vl-2b"
+
+    freeze_vision_backbone: bool = False  # Qwen3-VL handles vision internally
+    freeze_llm_backbone: bool = False
+    unfreeze_last_llm_layer: bool = False
+
+    per_device_batch_size: int = 32
+    global_batch_size: int = -1
+
+
+@dataclass
+class Qwen3VL_7B(Qwen3VL_2B):
+    vla_id: str = "qwen3-vl-7b"
+    base_vlm: Union[str, Path] = "qwen3-vl-7b"
+    per_device_batch_size: int = 16
+
+
+@dataclass
+class Qwen3VL_4B(Qwen3VL_2B):
+    vla_id: str = "qwen3-vl-4b"
+    base_vlm: Union[str, Path] = "qwen3-vl-4b"
+    per_device_batch_size: int = 16
+
+
 # === Define a VLA Registry Enum for Reference & Validation ===
 @unique
 class VLARegistry(Enum):
-    # Sanity Check Configurations =>> BridgeV2
-    SIGLIP_224PX_MX_BRIDGE = Exp_SigLIP_224px_Bridge
-    DINOSIGLIP_224PX_MX_BRIDGE = Exp_DinoSigLIP_224px_Bridge
-    # SigLIP Frozen Backbone Experiment
-    FREEZE_SIGLIP_224PX_MX_BRIDGE = Exp_FreezeVIT_SigLIP_224px_Bridge
-    # [OpenVLA v0.1 7B] SigLIP 224px + OXE Magic Soup
-    SIGLIP_224PX_MX_OXE_MAGIC_SOUP = Exp_SigLIP_224px_OXE_Magic_Soup
-    # [OpenVLA 7B] DINO + SigLIP 224px + OXE Magic Soup++
-    DINOSIGLIP_224PX_MX_OXE_MAGIC_SOUP_PLUS = Exp_DinoSigLIP_224px_OXE_Magic_Soup_Plus
-
     # === Custom Trajectory Training ===
     Base = Base
     Base_4090 = Base_4090
+
+    # === Debug Models ===
+    DISTILGPT2 = DistilGPT2
+
+    # === Qwen3-VL Models ===
+    QWEN3_VL_2B = Qwen3VL_2B
+    QWEN3_VL_7B = Qwen3VL_7B
+    QWEN3_VL_4B = Qwen3VL_4B
 
     @property
     def vla_id(self) -> str:

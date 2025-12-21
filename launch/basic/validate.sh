@@ -45,7 +45,7 @@ echo "============================================"
 
 cd "${PROJECT_ROOT}"
 
-torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} vla-scripts/train.py \
+torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} scripts/train.py \
   --mode.type test \
   --mode.validate_checkpoint_path "${PRETRAINED_CKPT}" \
   --mode.validate_data_length ${VALIDATE_DATA_LENGTH} \

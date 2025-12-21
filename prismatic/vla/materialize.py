@@ -46,7 +46,6 @@ def get_vla_dataset_and_collator(
     vla_tokenizer = VlaTokenizer(
         trajectory_converter=trajectory_converter,
         base_tokenizer=base_tokenizer,
-        image_transform=image_transform,
         prompt_builder_fn=prompt_builder_fn,
         predict_stop_token=predict_stop_token,
         default_image_resolution=default_image_resolution,
@@ -55,6 +54,7 @@ def get_vla_dataset_and_collator(
     trajectory_compressor = TRAJECTORY_COMPRESSION_REGISTRY[trajectory_compression_method]() # 注意需要括号才能实例化
     dataset = MyLeRobotDataset(
         repo_id=data_repo_id,
+        image_transform=image_transform,
         tokenizer=vla_tokenizer,
         trajectory_compression=trajectory_compressor,
         task_ids=data_task_ids

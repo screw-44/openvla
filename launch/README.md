@@ -122,7 +122,7 @@ RUN_ID_NOTE="实验X-${EXPERIMENT_NAME}"
 
 # 启动训练
 cd "${PROJECT_ROOT}"
-torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} vla-scripts/train.py \
+torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} scripts/train.py \
   --mode.type train \
   --vla.type "${VLA_TYPE}" \
   ...
@@ -173,5 +173,5 @@ chmod +x launch/experiments/*.sh
 ## 📚 更多信息
 
 - 原始脚本位于项目根目录: `run.sh`, `train_with_validate.sh`, `validate.sh`
-- 训练脚本: `vla-scripts/train.py`
+- 训练脚本: `scripts/train.py`
 - 配置文档: `prismatic/conf/`

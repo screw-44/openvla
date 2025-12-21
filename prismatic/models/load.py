@@ -8,14 +8,14 @@ IDs, mappings to paper experiments, and short descriptions), as well as for load
 import json
 import os
 from pathlib import Path
-from typing import List, Optional, Union
-
-import torch
+from typing import List, Optional, Tuple, Union
 
 from prismatic.conf import ModelConfig, VLAConfig
-from prismatic.models.materialize import get_llm_backbone_and_tokenizer, get_vision_backbone_and_transform
-from prismatic.models.registry import GLOBAL_REGISTRY, MODEL_REGISTRY
-from prismatic.models.vlas import OpenVLA
+from prismatic.models.materialize import (
+    get_llm_backbone_and_tokenizer,
+    get_vision_backbone_and_transform,
+)
+from prismatic.models.vlms import VLA
 from prismatic.overwatch import initialize_overwatch
 from prismatic.vla.tokenizer import TRAJECTORY_CONVERTER_REGISTRY
 
@@ -24,315 +24,218 @@ from prismatic.util.hf_utils import find_model_in_cache
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
 
-# === HF Hub Repository ===
-HF_HUB_REPO = "TRI-ML/prismatic-vlms"
-VLA_HF_HUB_REPO = "openvla/openvla-dev"
+# Model ID to complete snapshot path mapping
+MODEL_ID_TO_HF_PATH = {
+    "distilgpt2": "models--distilgpt2/snapshots/2290a62682d06624634c1f46a6ad5be0f47f38aa",
+    "qwen3-vl-2b": "models--Qwen--Qwen3-VL-2B-Instruct/snapshots/89644892e4d85e24eaac8bacfd4f463576704203",
+    "qwen3-vl-4b": "models--Qwen--Qwen3-VL-4B-Instruct/snapshots/ebb281ec70b05090aa6165b016eac8ec08e71b17",
+    "qwen3-vl-7b": "models--Qwen--Qwen2.5-VL-7B-Instruct/snapshots/placeholder",  # TODO: Add real path when available
+    "qwen3-vl-72b": "models--Qwen--Qwen2.5-VL-72B-Instruct/snapshots/placeholder",  # TODO: Add real path when available
+}
 
-# === Available Models ===
-def available_models() -> List[str]:
-    return list(MODEL_REGISTRY.keys())
+# Path type constants
+PATH_TYPE_CHECKPOINT = "checkpoints"
+PATH_TYPE_HF_CACHED = "hf_hub_cached"
 
-def available_model_names() -> List[str]:
-    return list(GLOBAL_REGISTRY.items())
 
-def get_model_description(model_id_or_name: str) -> str:
-    if model_id_or_name not in GLOBAL_REGISTRY:
-        raise ValueError(f"Couldn't find `{model_id_or_name = }; check `prismatic.available_model_names()`")
-    # Print Description & Return
-    print(json.dumps(description := GLOBAL_REGISTRY[model_id_or_name]["description"], indent=2))
-    return description
-
-# === Helper Functions for Path Detection ===
-def _resolve_hf_hub_path_to_local_cache(hf_hub_path: str) -> Optional[Path]:
+def _detect_model_path_type(model_id_or_path: Union[str, Path]) -> Tuple[str, Path]:
     """
-    Attempt to resolve a HuggingFace Hub path (e.g., 'TRI-ML/prismatic-vlms/siglip-224px+7b') 
-    to a local cache directory.
-    
-    This function checks HF_HOME environment variable and looks for the cached model.
-    Returns None if not found locally.
+    两种情况，训练的checkpoint和提前load的hf cache
     """
-    # Extract repo_id and subfolder from HF Hub path
-    # Format: "owner/repo_id/subfolder" or "owner/repo_id"
-    parts = hf_hub_path.split("/")
-    if len(parts) < 2:
-        return None
-    
-    # Reconstruct repo_id (e.g., "TRI-ML/prismatic-vlms")
-    repo_id = "/".join(parts[:2])
-    subfolder = "/".join(parts[2:]) if len(parts) > 2 else None
-    
-    # Normalize repo_id for HF cache directory format (replace "/" with "--")
-    # e.g., "TRI-ML/prismatic-vlms" -> "models--TRI-ML--prismatic-vlms"
-    cache_dir_name = f"models--{repo_id.replace('/', '--')}"
-    
-    # Check HF_HOME or use default
-    hf_home = os.environ.get("HF_HOME") or str(Path.home() / ".cache" / "huggingface")
-    candidate_path = Path(hf_home) / "hub" / cache_dir_name
-    
-    if not candidate_path.exists():
-        return None
-    
-    # Look for the latest snapshot
-    snapshots_dir = candidate_path / "snapshots"
-    if not snapshots_dir.exists() or not list(snapshots_dir.iterdir()):
-        return None
-    
-    # Get the first (and typically only) snapshot directory
-    snapshot_dir = next(iter(snapshots_dir.iterdir()))
-    
-    # If there's a subfolder, append it
-    if subfolder:
-        full_path = snapshot_dir / subfolder
+    model_id_or_path = str(model_id_or_path)
+    # 1. Check if it's a known model ID (highest priority)
+    if model_id_or_path in MODEL_ID_TO_HF_PATH:
+        relative_path = MODEL_ID_TO_HF_PATH[model_id_or_path]
+        resolved_path = Path(os.environ.get("HF_HOME")) / "hub" / relative_path
+        if resolved_path.exists():
+            return PATH_TYPE_HF_CACHED, resolved_path
+    # 2. Check for checkpoint file (.safetensors)
+    elif model_id_or_path.endswith(".safetensors"):
+        return PATH_TYPE_CHECKPOINT, Path(model_id_or_path)
+    # 3. 报错找不到模型
     else:
-        full_path = snapshot_dir
-    
-    return full_path if full_path.exists() else None
+        model_ids = ", ".join(MODEL_ID_TO_HF_PATH.keys())
+        raise ValueError(
+            f"Model path `{model_id_or_path}` not found.\n\n"
+            f"Supported Model IDs: {model_ids}\n\n"
+            f"To download models, run:\n"
+            f"  python download_models.py --model <model_id>"
+        )
 
 
-def _detect_model_path_type(model_id_or_path: Union[str, Path]) -> tuple[str, Union[str, Path]]:
-    """
-    Detect the type of model path and return (path_type, resolved_path).
-    
-    Supported path types:
-    - "checkpoint": Local checkpoint file (.pt)
-    - "local_dir": Local directory with config.json and checkpoints/
-    - "hf_hub_cached": HuggingFace Hub path that resolves to local cache
-    
-    Note: Supports HF Hub paths like 'TRI-ML/prismatic-vlms/siglip-224px+7b' but requires
-    the model to be pre-cached locally (e.g., in HF_HOME).
-    """
-    # Convert to Path if string and check if it's a file path
-    if isinstance(model_id_or_path, str):
-        if model_id_or_path.endswith(".pt") or model_id_or_path.startswith("/"):
-            path_obj = Path(model_id_or_path)
-            if path_obj.is_file() and path_obj.suffix == ".pt":
-                return "checkpoint", path_obj
-    elif isinstance(model_id_or_path, Path):
-        if model_id_or_path.is_file() and model_id_or_path.suffix == ".pt":
-            return "checkpoint", model_id_or_path
-    
-    # Check if it's a local directory
-    path_obj = Path(model_id_or_path)
-    if path_obj.is_dir():
-        return "local_dir", path_obj
-    
-    # Try to resolve as HF Hub path to local cache
-    if isinstance(model_id_or_path, str) and "/" in model_id_or_path:
-        cached_path = _resolve_hf_hub_path_to_local_cache(model_id_or_path)
-        if cached_path is not None:
-            return "hf_hub_cached", cached_path
-    
-    # If not found, provide helpful error
-    hf_home = os.environ.get("HF_HOME") or str(Path.home() / ".cache" / "huggingface")
-    raise ValueError(
-        f"Model path `{model_id_or_path}` not found. "
-        f"Supported formats:\n"
-        f"  1. Local checkpoint: /path/to/checkpoint.pt\n"
-        f"  2. Local directory: /path/to/model/\n"
-        f"  3. HuggingFace Hub (must be cached): TRI-ML/prismatic-vlms/siglip-224px+7b\n"
-        f"\nIf using HF Hub path, ensure model is cached locally at:\n"
-        f"  {hf_home}/hub/models--<REPO_ID>/snapshots/\n"
-        f"\nNote: Remote downloads are not supported; use offline mode only."
-    )
-
-
-def _load_base_components(
-    vision_backbone_id: str,
-    llm_backbone_id: str,
-    arch_specifier: str,
-    image_resize_strategy: str,
-    llm_max_length: int,
-    load_for_training: bool = False,
-) -> tuple:
-    """
-    Load vision backbone, LLM backbone, and related components (offline mode).
-    Returns: (vision_backbone, image_transform, llm_backbone, tokenizer)
-    """
-    # Load Vision Backbone
-    overwatch.info(f"Loading Vision Backbone [bold]{vision_backbone_id}[/]")
-    vision_backbone, image_transform = get_vision_backbone_and_transform(
-        vision_backbone_id,
-        image_resize_strategy,
-    )
-    # Load LLM Backbone
-    overwatch.info(f"Loading Pretrained LLM [bold]{llm_backbone_id}[/] via HF Transformers (local cache only)")
-    llm_backbone, tokenizer = get_llm_backbone_and_tokenizer(
-        llm_backbone_id,
-        llm_max_length=llm_max_length,
-        inference_mode=not load_for_training,
-    )
-    return vision_backbone, image_transform, llm_backbone, tokenizer
-
-
-# === Load Pretrained Model ===
-def load(
-    vla_cfg: VLAConfig,
-    checkpoint_path: Union[str, Path] = None,
-    cache_dir: Optional[Union[str, Path]] = None,
-    load_for_training: bool = False,
-) -> OpenVLA:
-    """
-    Loads a pretrained OpenVLA model from a local path (offline mode).
-    
-    This function only supports loading from local disk paths. Remote models from HuggingFace Hub
-    are no longer supported to enable offline operation.
-    
-    Supported input types:
-    - Checkpoint file (.pt): Reads vla.json from the checkpoint's parent directory
-    - Local directory: Reads vla.json or config.json and checkpoints/latest-checkpoint.pt
-    
-    Args:
-        model_id_or_path: Path to checkpoint file or local directory
-        cache_dir: Ignored (kept for backward compatibility). Models must be pre-cached locally.
-        load_for_training: Whether to load in training mode (affects inference_mode, weight freezing)
-        vla_config_overrides: Dictionary to override VLA config values (e.g., trajectory converter params)
-    
-    Returns:
-        OpenVLA: Always returns an OpenVLA instance with trajectory_converter initialized
-    """
-    # Initialize variables that will be set in different branches
-    checkpoint_pt = None
-    model_cfg = {}
-
-    path_type, resolved_path = _detect_model_path_type(
-        vla_cfg.base_vlm if not checkpoint_path else checkpoint_path)
-
-    # 没有传入checkpoint path，从vla_cfg构建。大部分情况
-    if path_type == "hf_hub_cached":
-        # Detect path type and resolve path
-        path_type, resolved_path = _detect_model_path_type(vla_cfg.base_vlm)
-        model_dir = Path(resolved_path)
-        overwatch.info(f"Assuming base model directory. Loading from HF Hub cached model `{checkpoint_path}` at `{model_dir}`")
-        
-        config_json = model_dir / "config.json"
-        checkpoint_pt = model_dir / "checkpoints" / "latest-checkpoint.pt"
-        if config_json.exists():
-            with open(config_json, "r") as f:
-                config_data = json.load(f)
-            model_cfg = config_data.get("model", {})
-    # 传入checkpoint路径本地load
-    elif path_type == "checkpoint": 
-        checkpoint_pt = Path(resolved_path)
-        overwatch.info(f"Loading from checkpoint file `{checkpoint_pt}`")
-        # Validate checkpoint path structure
-        assert checkpoint_pt.suffix == ".pt" and checkpoint_pt.parent.name == "checkpoints", \
-            f"Invalid checkpoint path; expected .../checkpoints/*.pt, got {checkpoint_pt}"
-    # 传入path从本地load
-    else:
-        run_dir = Path(resolved_path)
-        overwatch.info(f"Loading from local directory `{run_dir}`")
-        checkpoint_pt = run_dir / "checkpoints" / "latest-checkpoint.pt"
-        assert checkpoint_pt.exists(), f"Missing checkpoint at `{checkpoint_pt}`"
-    
-    # ===== Load Base Components =====
-    # Get model configuration - handle missing model_cfg from training config
-    if not model_cfg:
-        # When loading from training checkpoint, config.json might not have 'model' field
-        # Instead, we need to reconstruct it from base_vlm and vla config
-        base_vlm_id = vla_cfg.base_vlm
-        
-        if base_vlm_id:
-            overwatch.info(f"Reconstructing model config from base_vlm: {base_vlm_id}")
-            # Try to get model config from ModelConfig registry
-            try:
-                model_id = base_vlm_id
-                if "/" in model_id:
-                    # Extract the last part from HF path format
-                    model_id = model_id.split("/")[-1]
-                
-                model_cfg_instance = ModelConfig.get_choice_class(model_id)()
-                model_cfg = {
-                    "model_id": getattr(model_cfg_instance, "model_id", model_id),
-                    "vision_backbone_id": getattr(model_cfg_instance, "vision_backbone_id", None),
-                    "llm_backbone_id": getattr(model_cfg_instance, "llm_backbone_id", None),
-                    "arch_specifier": getattr(model_cfg_instance, "arch_specifier", "gelu-mlp"),
-                    "image_resize_strategy": getattr(model_cfg_instance, "image_resize_strategy", "letterbox"),
-                    "llm_max_length": getattr(model_cfg_instance, "llm_max_length", 2048),
-                }
-            except Exception as e:
-                overwatch.warning(f"Could not load model from ModelConfig registry: {e}")
-                model_cfg = None
-    
-        # If still no config, provide helpful error
-        if not model_cfg:
-            raise ValueError(
-                f"Could not determine model configuration from checkpoint. "
-                f"The config.json is missing the 'model' field. "
-                f"base_vlm was: {base_vlm_id}. "
-                f"Please ensure checkpoint was saved with proper model configuration."
-            )
-    
-    overwatch.info(
-        f"Found Config =>> Loading [bold blue]{model_cfg.get('model_id', 'unknown')}[/] with:\n"
-        f"             Vision Backbone =>> [bold]{model_cfg.get('vision_backbone_id', 'unknown')}[/]\n"
-        f"             LLM Backbone    =>> [bold]{model_cfg.get('llm_backbone_id', 'unknown')}[/]\n"
-        f"             Arch Specifier  =>> [bold]{model_cfg.get('arch_specifier', 'unknown')}[/]\n"
-        f"             Checkpoint Path =>> [underline]`{checkpoint_pt}`[/]"
-    )
-    
-    # Load base components
-    vision_backbone, image_transform, llm_backbone, tokenizer = _load_base_components(
-        vision_backbone_id=model_cfg["vision_backbone_id"],
-        llm_backbone_id=model_cfg["llm_backbone_id"],
-        arch_specifier=model_cfg["arch_specifier"],
-        image_resize_strategy=model_cfg["image_resize_strategy"],
-        llm_max_length=model_cfg.get("llm_max_length", 2048),
-        load_for_training=load_for_training,
-    )
-    
-    # ===== Create Trajectory Converter =====
-    # Get trajectory converter config from VLA config or use defaults
+def create_trajectory_converter(vla_cfg: VLAConfig, tokenizer):
+    """Create trajectory converter from VLA config."""
     converter_type = vla_cfg.trajectory_converter_type
     converter_n_bins = vla_cfg.trajectory_n_bins
     converter_n_dims = vla_cfg.trajectory_n_dims
 
     overwatch.info(
-        f"Creating Trajectory Converter [bold]{converter_type}[/] with "
-        f"n_bins={converter_n_bins}, n_dims={converter_n_dims}"
+        f"Creating Trajectory Converter [bold]{converter_type}[/] "
+        f"(n_bins={converter_n_bins}, n_dims={converter_n_dims})"
     )
-    
+
     if converter_type not in TRAJECTORY_CONVERTER_REGISTRY:
         raise ValueError(
             f"Unknown trajectory converter type `{converter_type}`. "
             f"Available: {list(TRAJECTORY_CONVERTER_REGISTRY.keys())}"
         )
-    
-    trajectory_converter = TRAJECTORY_CONVERTER_REGISTRY[converter_type](
+
+    return TRAJECTORY_CONVERTER_REGISTRY[converter_type](
         tokenizer=tokenizer,
         n_bins=converter_n_bins,
         n_dims=converter_n_dims,
     )
-    
-    # ===== Load VLM Checkpoint and Initialize OpenVLA =====
-    overwatch.info(f"Loading VLM from checkpoint and initializing OpenVLA")
-    
-    # Create OpenVLA using from_pretrained, which automatically calls __init__ with trajectory_converter
-    vla = OpenVLA.from_pretrained(
-        checkpoint_pt,
-        model_cfg["model_id"],
-        vision_backbone,
-        llm_backbone,
-        trajectory_converter=trajectory_converter,
-        arch_specifier=model_cfg["arch_specifier"],
-        freeze_weights=not load_for_training,
-    )
-    
-    overwatch.info(f"Successfully loaded OpenVLA model with trajectory converter")
-    
-    # Ensure model is on GPU for inference (required for Flash Attention 2 and optimal performance)
-    # For training, FSDP will handle device placement automatically via device_id parameter
-    if not load_for_training:
-        # Check if model is already on CUDA (e.g., moved by FSDP during training)
-        first_param = next(vla.parameters())
-        if first_param.device.type != "cuda":
-            # Inference mode: move to CUDA if available
-            if torch.cuda.is_available():
-                vla = vla.to("cuda")
-                overwatch.info("Model moved to CUDA for inference")
-            else:
-                overwatch.warning("CUDA not available; model will run on CPU (Flash Attention 2 will not work)")
-        else:
-            overwatch.info(f"Model already on device: {first_param.device}")
-    
-    return vla
 
+
+def _load_model_config(resolved_path: Path, vla_cfg: VLAConfig) -> dict:
+    """
+    Load model configuration from checkpoint directory or VLA config.
+
+    Returns:
+        Dictionary with model configuration fields
+    """
+    config_json = resolved_path / "config.json"
+
+    # Try loading from config.json first
+    if config_json.exists():
+        with open(config_json, "r") as f:
+            config_data = json.load(f)
+        model_cfg = config_data.get("model", {})
+        if model_cfg:
+            return model_cfg
+
+    # Fallback: reconstruct from base_vlm in VLA config
+    base_vlm_id = vla_cfg.base_vlm
+    if not base_vlm_id:
+        raise ValueError(
+            "Could not determine model configuration. "
+            "No config.json found and vla_cfg.base_vlm is not set."
+        )
+
+    overwatch.info(f"Reconstructing model config from base_vlm: {base_vlm_id}")
+
+    # Extract model ID from HF path if needed
+    model_id = base_vlm_id.split("/")[-1] if "/" in base_vlm_id else base_vlm_id
+
+    try:
+        model_cfg_instance = ModelConfig.get_choice_class(model_id)()
+        return {
+            "model_id": getattr(model_cfg_instance, "model_id", model_id),
+            "vision_backbone_id": getattr(
+                model_cfg_instance, "vision_backbone_id", None
+            ),
+            "llm_backbone_id": getattr(model_cfg_instance, "llm_backbone_id", None),
+            "arch_specifier": getattr(model_cfg_instance, "arch_specifier", "gelu-mlp"),
+            "image_resize_strategy": getattr(
+                model_cfg_instance, "image_resize_strategy", "letterbox"
+            ),
+            "llm_max_length": getattr(model_cfg_instance, "llm_max_length", 2048),
+        }
+    except Exception as e:
+        raise ValueError(
+            f"Could not load model configuration from ModelConfig registry. "
+            f"base_vlm: {base_vlm_id}, error: {e}"
+        )
+
+
+# === Main Load Function ===
+def load(
+    vla_cfg: VLAConfig,
+    checkpoint_path: Optional[Union[str, Path]] = None,
+    load_for_training: bool = False,
+) -> VLA:
+    """
+    Load pretrained OpenVLA model (offline mode).
+
+    Supports loading from:
+    - Checkpoint file: /path/to/checkpoints/model.pt
+    - HF cached model: Model ID or HF path resolved to local cache
+
+    Args:
+        vla_cfg: VLA configuration with base_vlm and trajectory converter settings
+        checkpoint_path: Optional checkpoint path (overrides vla_cfg.base_vlm)
+        load_for_training: Whether to load for training (affects freezing)
+
+    Returns:
+        OpenVLA model instance with trajectory converter
+    """
+    # Determine which path to use
+    model_path = checkpoint_path if checkpoint_path else vla_cfg.base_vlm
+
+    # Detect and resolve path
+    path_type, resolved_path = _detect_model_path_type(model_path)
+    overwatch.info(f"Loading from {path_type}: {resolved_path}")
+
+    # For HF cached models, resolved_path is already the snapshot directory
+    model_dir = Path(resolved_path)
+    checkpoint_safetensors = model_dir / "checkpoints" / "latest-checkpoint.safetensors"
+    if not checkpoint_safetensors.exists():
+        checkpoint_safetensors = None
+
+    # Load model configuration
+    model_cfg = _load_model_config(model_dir, vla_cfg)
+
+    overwatch.info(
+        f"Model Configuration:\n"
+        f"  Model ID:         [bold blue]{model_cfg.get('model_id')}[/]\n"
+        f"  Vision Backbone:  [bold]{model_cfg.get('vision_backbone_id')}[/]\n"
+        f"  LLM Backbone:     [bold]{model_cfg.get('llm_backbone_id')}[/]\n"
+        f"  Arch Specifier:   [bold]{model_cfg.get('arch_specifier')}[/]\n"
+        f"  Checkpoint:       [underline]{checkpoint_safetensors}[/]"
+    )
+
+    # Load base components (vision + LLM backbones)
+    overwatch.info(
+        f"Loading Vision Backbone [bold]{model_cfg['vision_backbone_id']}[/]"
+    )
+    vision_backbone, image_transform = get_vision_backbone_and_transform(
+        model_cfg["vision_backbone_id"], model_cfg["image_resize_strategy"]
+    )
+
+    overwatch.info(
+        f"Loading LLM Backbone [bold]{model_cfg['llm_backbone_id']}[/] "
+        f"(mode: {'training' if load_for_training else 'inference'})"
+    )
+    llm_backbone, tokenizer = get_llm_backbone_and_tokenizer(
+        model_cfg["llm_backbone_id"],
+        llm_max_length=model_cfg.get("llm_max_length", 2048),
+        inference_mode=not load_for_training,
+    )
+
+    # Create trajectory converter
+    trajectory_converter = create_trajectory_converter(vla_cfg, tokenizer)
+
+    # Initialize OpenVLA model
+    overwatch.info("Initializing OpenVLA model")
+    if checkpoint_safetensors is not None:
+        # Load from existing checkpoint
+        vla = VLA.from_pretrained(
+            checkpoint_safetensors,
+            model_cfg["model_id"],
+            vision_backbone,
+            llm_backbone,
+            trajectory_converter=trajectory_converter,
+            arch_specifier=model_cfg["arch_specifier"],
+            freeze_weights=not load_for_training,
+        )
+    else:
+        # Create new OpenVLA model without checkpoint (fresh initialization)
+        overwatch.info(
+            "No checkpoint found; creating fresh OpenVLA model from backbones"
+        )
+        vla = VLA(
+            model_cfg["model_id"],
+            vision_backbone,
+            llm_backbone,
+            trajectory_converter=trajectory_converter,
+            arch_specifier=model_cfg["arch_specifier"],
+        )
+
+    if not load_for_training:
+        overwatch.info("Loading for inference, use evaluation mode.")
+        vla.requires_grad_(False)
+        vla.eval()
+
+    overwatch.info("✅ Successfully loaded OpenVLA model")
+
+    return vla

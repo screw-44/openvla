@@ -39,10 +39,12 @@ class DatasetConfig(ChoiceRegistry):
     # === Trajectory Compression ===
     trajectory_compression: str = "bining"                      # Trajectory compression method
     
-    def get_task_ids(self) -> List[int]:
-        """获取任务 ID 列表，如果未指定则返回默认值"""
-        if self.task_ids is None:
-            return [0]
+    def get_task_ids(self) -> Optional[List[int]]:
+        """
+        获取任务 ID 列表。
+        - 返回 None: 加载所有任务的 episodes
+        - 返回 List[int]: 只加载指定任务 ID 对应的 episodes
+        """
         return self.task_ids
 
 

@@ -2,437 +2,182 @@
 metrics.py
 
 Utility classes defining a Metrics container and multiple Trackers to enable model/stage-specific logging.
-Now uses trackio (imported as wandb) for experiment tracking.
+Now uses trackio (imported as trackio) for experiment tracking.
 """
+
 import time
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Dict, Optional, Protocol, Tuple, Union
 
-import jsonlines
+import pandas as pd
 import numpy as np
 import torch
-import trackio as wandb
+import trackio
 
+from transformers.modeling_outputs import CausalLMOutputWithPast
+from prismatic.models.vlms.vla import VLA
 from prismatic.overwatch import initialize_overwatch
 
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
 
 
-class Tracker:
-    """Tracker using trackio (imported as wandb) for experiment tracking"""
-    def __init__(
-        self,
-        run_id: str,
-        hparams: Dict[str, Any],
-        group: str = "align",  # 项目里面的一类实验
-        project: str = "vla-training", # 一个大项目的名称
-    ) -> None:
-        self.run_id, self.hparams = run_id, hparams
-
-        # Get trackio initialization parameters
-        self.group = group
-        self.project = project
-
-        # Call trackio.init()
-        self.initialize()
-
-    @overwatch.rank_zero_only
-    def initialize(self) -> None:
-        # trackio.init() requires 'project' as a positional argument
-        wandb.init(
-            project=self.project,
-            name=self.run_id, # name 就是 run_id(需要设立完全可读的run_id)
-            config=self.hparams,
-            group=self.group,
-        )
-
-    @overwatch.rank_zero_only
-    def write_hyperparameters(self) -> None:
-        wandb.config = self.hparams
-
-    @overwatch.rank_zero_only
-    def write(self, global_step: int, metrics: Dict[str, Union[int, float]]) -> None:
-        wandb.log(metrics, step=global_step)
-
-    @staticmethod
-    def finalize() -> None:
-        if overwatch.is_rank_zero():
-            wandb.finish()
-
-        # A job gets 210 seconds to get its affairs in order
-        time.sleep(210)
-
-
-# === Core Metrics Container :: Initializes Trackers => Compiles/Pushes Metrics ===
-
 class VLAMetrics:
     def __init__(
         self,
         run_id: str,
         hparams: Dict[str, Any],
-        grad_accumulation_steps: int = 1,
-        window_size: int = 1,
+        group: str,
         resume_step: Optional[int] = None,
         resume_epoch: Optional[int] = None,
         project: str = "vla-training",
     ) -> None:
-        self.run_id, self.hparams = run_id, hparams
+        trackio.init(project=project, name=run_id, config=hparams, group=group)
 
-        # Initialize Trackers
-        self.tracker = Tracker(run_id, hparams, group="vla-train", project=project)
-        self.tracker.write_hyperparameters()
-
-        # Create Universal Metrics Buffers
         self.global_step = 0 if resume_step is None else resume_step
         self.epoch = 0 if resume_epoch is None else resume_epoch
-        self.start_time, self.step_start_time = time.time(), time.time()
-        self.state = {
-            "loss_raw": deque(maxlen=grad_accumulation_steps),
-            "loss": deque(maxlen=window_size),
-            "l1_loss": deque(maxlen=window_size),
-            "action_accuracy": deque(maxlen=window_size),
-            "step_time": deque(maxlen=window_size),
-            "lr": [],
-        }
 
-        # Created metrics buffers for individual tracked datasets
-        # 注意：这里不应该创建完整的 VLAMetrics 对象，只需要创建简单的 state 字典
-        def create_dataset_tracker():
-            return {
-                "l1_loss": deque(maxlen=window_size),
-                "action_accuracy": deque(maxlen=window_size),
-            }
-        self.dataset_trackers = defaultdict(create_dataset_tracker)
+        self.log_freq = 2  # 每记录10次才log一次
+        self.detail_log_freq = 20  # 每100次才详细的log一次
 
-        # Validation table buffer for collecting and storing validation samples
-        # Structure: {
-        #     'predictions': List[np.ndarray],
-        #     'ground_truths': List[np.ndarray],
-        #     'dataset_name': Optional[str],
-        #     'num_samples': int,
-        # }
-        self.validation_table_buffer = {}
-
-    def log(self, global_step: int, metrics: Dict[str, Union[int, float]]) -> None:
-        self.tracker.write(global_step, metrics)
-
-    @overwatch.rank_zero_only
-    def log_validation_samples(
+    def log_pro(
         self,
-        predictions: list,
-        ground_truths: list,
-        max_samples: int = 4,
-        dataset_name: Optional[str] = None,
+        output: CausalLMOutputWithPast,
+        input: Dict[str, torch.Tensor],  # input
+        vla: VLA,  # PrismaticVLM model
+        lr: float,
     ) -> None:
         """
-        Collect validation samples to buffer for later table generation.
-        
+        Compute all action prediction metrics from model output and batch labels.
+
+        Handles variable-length sequences by inferring action start positions from labels,
+        extracting action logits safely, and computing accuracy/L1 metrics.
+
         Args:
-            predictions: List of predicted trajectories (np.ndarray or list format)
-            ground_truths: List of ground truth trajectories (np.ndarray or list format)
-            max_samples: Maximum number of samples to store (default: 4)
-            dataset_name: Optional dataset identifier for organizing samples by dataset
+            output: CausalLMOutputWithPast containing logits [B, L, V]
+            batch: Dict with 'labels' [B, L], 'pixel_values', etc.
+            vla: PrismaticVLM model (for trajectory_converter)
+            global_step: Current training step (for logging)
         """
-        if len(predictions) == 0 or len(ground_truths) == 0:
-            return
-        
-        # Limit number of samples to store
-        num_samples = min(len(predictions), len(ground_truths), max_samples)
-        
-        self.validation_table_buffer = {
-            'predictions': predictions[:num_samples],
-            'ground_truths': ground_truths[:num_samples],
-            'dataset_name': dataset_name,
-            'num_samples': num_samples,
-        }
-
-    @overwatch.rank_zero_only
-    def log_validation_table(
-        self,
-        avg_loss: float,
-        avg_accuracy: float,
-        l1_errors: Optional[list] = None,
-        dataset_name: Optional[str] = None,
-    ) -> None:
-        """
-        Generate validation prediction table and log to trackio.
-        
-        This method:
-        1. Retrieves samples from validation_table_buffer
-        2. Creates a trackio.Table object with prediction vs ground truth data
-        3. Logs metrics and table with unique keys to ensure proper experiment isolation
-        4. Cleans up the buffer
-        
-        Args:
-            avg_loss: Average validation loss
-            avg_accuracy: Average action accuracy
-            l1_errors: List of L1 errors for each sample (optional, will be computed if not provided)
-            dataset_name: Optional dataset name for multi-dataset validation scenarios
-        """
-        if not self.validation_table_buffer:
-            overwatch.warning("No validation samples in buffer. Skipping table generation.")
-            return
-        
-        import trackio as wandb
-        
-        # Retrieve data from buffer
-        preds = self.validation_table_buffer['predictions']
-        gts = self.validation_table_buffer['ground_truths']
-        num_samples = self.validation_table_buffer['num_samples']
-        buffer_dataset_name = self.validation_table_buffer.get('dataset_name')
-        
-        # Use provided dataset_name if available, otherwise use buffer's dataset_name
-        effective_dataset_name = dataset_name or buffer_dataset_name
-        
-        # Construct table data
-        table_data = []
-        for i in range(num_samples):
-            # Convert predictions to string representation
-            if isinstance(preds[i], np.ndarray):
-                pred_array = preds[i]
-            else:
-                pred_array = np.array(preds[i])
-            
-            if isinstance(gts[i], np.ndarray):
-                gt_array = gts[i]
-            else:
-                gt_array = np.array(gts[i])
-            
-            # Truncate long arrays for display
-            pred_str = str(pred_array[:5]) + '...' if len(pred_array) > 5 else str(pred_array)
-            gt_str = str(gt_array[:5]) + '...' if len(gt_array) > 5 else str(gt_array)
-            
-            # Compute L1 error if not provided
-            if l1_errors is not None and i < len(l1_errors):
-                l1_error = l1_errors[i]
-            else:
-                l1_error = float(np.mean(np.abs(pred_array - gt_array)))
-            
-            table_data.append({
-                'Sample ID': str(i),
-                'Prediction': pred_str,
-                'Ground Truth': gt_str,
-                'L1 Error': f"{l1_error:.4f}"
-            })
-        
-        # Create trackio Table object
-        prediction_table = wandb.Table(
-            columns=['Sample ID', 'Prediction', 'Ground Truth', 'L1 Error'],
-            data=table_data
-        )
-        
-        # Build unique table key with dataset name for multi-dataset scenarios
-        # This ensures tables from different datasets don't collide
-        ds_suffix = f"_{effective_dataset_name}" if effective_dataset_name else ""
-        table_key = f"VLA Validation/prediction_samples{ds_suffix}"
-        
-        # Log validation metrics and table to trackio
-        # Note: Each VLAMetrics instance has its own tracker with unique run_id,
-        # so multiple experiments automatically get isolated in trackio
-        validation_metrics = {
-            table_key: prediction_table,
-            f"VLA Validation/loss{ds_suffix}": avg_loss,
-            f"VLA Validation/accuracy{ds_suffix}": avg_accuracy,
-        }
-        
-        self.log(self.global_step, validation_metrics)
-        
-        # Clean up buffer after logging
-        self.validation_table_buffer = {}
-
-    def get_status(self, loss: Optional[torch.Tensor] = None) -> str:
-        lr = self.state["lr"][-1] if len(self.state["lr"]) > 0 else 0
-        if loss is None:
-            return f"=>> [Epoch {self.epoch:03d}] Global Step {self.global_step:06d} =>> LR :: {lr:.6f}"
-
-        # Otherwise, embed `loss` in status report!
-        return f"=>> [Epoch {self.epoch:03d}] Global Step {self.global_step:06d} =>> LR :: {lr:.6f} - Loss :: {loss:.4f}"
-
-    def commit(
-        self,
-        *,
-        global_step: Optional[int] = None,
-        epoch: Optional[int] = None,
-        lr: Optional[float] = None,
-        update_step_time: bool = False,
-        **kwargs,
-    ) -> None:
-        """Update all metrics in `self.state` by iterating through special positional arguments & kwargs."""
-        if global_step is not None:
-            self.global_step = global_step
-
-        if epoch is not None:
-            self.epoch = epoch
-
-        # For all other variables --> only track on rank zero!
-        if not overwatch.is_rank_zero():
+        # 按照一定的频率来进行记录（这里比较costly，不全部记录）
+        if self.global_step % self.log_freq != 0:
             return
 
-        # Special Positional Arguments
-        if lr is not None:
-            self.state["lr"].append(lr)
+        # print("keys:", input.keys())
 
-        if update_step_time:
-            self.state["step_time"].append(time.time() - self.step_start_time)
-            self.step_start_time = time.time()
+        labels = input["labels"].to("cpu").numpy()
+        prompt_ids_length = input["prompt_ids_length"].to("cpu").numpy()
+        predicts = output.logits.argmax(dim=2).to("cpu").numpy()
+        batch_size = predicts.shape[0]
+        # print("label shape", batch["labels"].shape)
+        # print("input shape:", batch["input_ids"].shape)
+        # print("output logits shape:", output.logits.shape) # NOTE：这里输出中有image tokens，所以会远远长于输入
 
-        # Generic Keyword Arguments
-        for key, value in kwargs.items():
-            if key == "loss":
-                loss_val = value.detach()
-                self.state["loss_raw"].append(loss_val)
-                self.state["loss"].append(loss_val)
-            else:
-                self.state[key].append(value.detach())
+        total_correct, total_tokens = 0, 0  # token级别的准确率
+        full_cont_l1_loss, t0_cont_l1_loss = 0, 0  # 解码后连续action的l1距离
+        table_inputs, table_preds, table_gts = [], [], []
 
-    def commit_for_dataset(self, dataset_name: str, **kwargs) -> None:
-        # 直接将数据添加到对应数据集的 tracker 中
-        tracker_state = self.dataset_trackers[dataset_name]
-        for key, value in kwargs.items():
-            if key in tracker_state:
-                tracker_state[key].append(value.detach() if hasattr(value, 'detach') else value)
+        for i in range(batch_size):
+            start_idx = int(prompt_ids_length[i])
+            # GT: action tokens in labels (from start_idx onwards, excluding padding/eos)
+            gt = labels[i, start_idx:]
+            gt = gt[gt != -100]  # Remove IGNORE_INDEX padding
+            # Pred: 注意这里还有image的tokens，所以长度不match。所以很难找到对应的输入
+            # 同时看上去pred比输入整体往左偏移了1个token，（后面pad了一个token）。自回归的范式吧
+            padding_length = (labels[i, start_idx:] == -100).sum()
+            # print("padding length", padding_length, " gt length: ", len(gt))
+            pred_start_idx, pred_end_idx = (
+                predicts.shape[1] - len(gt) - padding_length - 1,
+                predicts.shape[1] - padding_length - 1,
+            )
+            pred = predicts[i, pred_start_idx:pred_end_idx]
+            # print(f"pred: {pred}, gt: {gt}")
 
-    @overwatch.rank_zero_only
-    def push(self) -> str:
-        # Note :: Raw Loss is an Average over Gradient Accumulation Steps --> No Smoothing!
-        loss_raw = float(torch.stack(list(self.state["loss_raw"])).mean().item())
-        loss = float(torch.stack(list(self.state["loss"])).mean().item())
-        l1_loss = float(torch.stack(list(self.state["l1_loss"])).mean().item())
-        action_accuracy = float(torch.stack(list(self.state["action_accuracy"])).mean().item())
-        step_time = float(np.mean(list(self.state["step_time"])))
-        lr = float(self.state["lr"][-1])
-        status = self.get_status(loss)
+            # 1. Token-level accuracy
+            total_correct += (pred == gt).sum()
+            total_tokens += len(gt)
+            # 2. Continuous trajectory L1 loss
+            cont_pred = vla.trajectory_converter.decode_text_ids_to_trajectory(pred)
+            cont_gt = vla.trajectory_converter.decode_text_ids_to_trajectory(gt)
+            full_cont_l1_loss += torch.nn.functional.l1_loss(
+                torch.as_tensor(cont_gt), torch.as_tensor(cont_pred)
+            ).item()
+            cont_pred_t0, cont_gt_t0 = cont_pred[0], cont_gt[0]
+            t0_cont_l1_loss += torch.nn.functional.l1_loss(
+                torch.as_tensor(cont_pred_t0), torch.as_tensor(cont_gt_t0)
+            ).item()
 
-        # Get metrics per dataset
-        dataset_metrics = {}
-        for ds, tracker_state in self.dataset_trackers.items():
-            # 检查是否有数据
-            if len(tracker_state["l1_loss"]) > 0 and len(tracker_state["action_accuracy"]) > 0:
-                dataset_metrics.update(
-                    {
-                        f"{ds}/L1 Loss": float(torch.stack(list(tracker_state["l1_loss"])).mean().item()),
-                        f"{ds}/Action Token Accuracy": float(torch.stack(list(tracker_state["action_accuracy"])).mean().item()),
-                    }
-                )
+            table_inputs.append(input["input_ids"][i, :start_idx])
+            table_preds.append(pred)
+            table_gts.append(gt)
 
-        # Fire to Trackers
+        token_precision = total_correct / total_tokens
+        # print("token precision:", token_precision)
+        full_cont_l1_loss /= batch_size
+        t0_cont_l1_loss /= batch_size
+        # print("full_l1_loss", full_cont_l1_loss)
+        # print("t0_cont_l1_loss", t0_cont_l1_loss)
+
         prefix = "VLA Train"
-        self.log(
-            self.global_step,
-            metrics={
-                f"{prefix}/Loss": loss,
-                f"{prefix}/L1 Loss": l1_loss,
-                f"{prefix}/Action Token Accuracy": action_accuracy,
-                f"{prefix}/Loss (Raw)": loss_raw,
+        trackio.log(
+            {
+                f"{prefix}/Loss": output.loss.item(),
+                f"{prefix}/Token Precision": token_precision,
+                f"{prefix}/Full Trajectory L1 Loss": full_cont_l1_loss,
+                f"{prefix}/T0 L1 Loss": t0_cont_l1_loss,
                 f"{prefix}/Learning Rate": lr,
-                f"{prefix}/Step Time": step_time,
-                **dataset_metrics,
             },
+            step=self.global_step,
         )
-        return status
 
-    def finalize(self) -> str:
-        self.tracker.finalize()
-
-
-
-
-
-
-
-
-
-
-
-# 我们train.py并不涉及到的部分
-class Metrics:
-    def __init__(
-        self,
-        active_trackers: Tuple[str, ...],
-        run_id: str,
-        run_dir: Path,
-        hparams: Dict[str, Any],
-        stage: str,
-        grad_accumulation_steps: int = 1,
-        window_size: int = 128,
-    ) -> None:
-        self.run_id, self.run_dir, self.hparams, self.stage = run_id, run_dir, hparams, stage
-
-        self.tracker = Tracker(run_id, hparams, group=self.stage, project="vla-training")
-        self.tracker.write_hyperparameters()
-
-        # Create Universal Metrics Buffers
-        self.global_step, self.start_time, self.step_start_time = 0, time.time(), time.time()
-        self.state = {
-            "loss_raw": deque(maxlen=grad_accumulation_steps),
-            "loss": deque(maxlen=window_size),
-            "step_time": deque(maxlen=window_size),
-            "lr": [],
-        }
-
-    def log(self, global_step: int, metrics: Dict[str, Union[int, float]]) -> None:
-        self.tracker.write(global_step, metrics)
-
-    def get_status(self, loss: Optional[torch.Tensor] = None) -> str:
-        lr = self.state["lr"][-1] if len(self.state["lr"]) > 0 else 0
-        if loss is None:
-            return f"=>> [Global Step] {self.global_step:06d} =>> LR :: {lr:.6f}"
-
-        # Otherwise, embed `loss` in status report!
-        return f"=>> [Global Step] {self.global_step:06d} =>> LR :: {lr:.6f} -- Loss :: {loss:.4f}"
-
-    def commit(
-        self, *, global_step: Optional[int] = None, lr: Optional[float] = None, update_step_time: bool = False, **kwargs
-    ) -> None:
-        """Update all metrics in `self.state` by iterating through special positional arguments & kwargs."""
-        if global_step is not None:
-            self.global_step = global_step
-
-        # For all other variables --> only track on rank zero!
-        if not overwatch.is_rank_zero():
+        # ===== 这里开始是记录image和table的数据, 控制频率来实现加速 =====
+        if self.global_step % self.detail_log_freq != 0:
             return
 
-        # Special Positional Arguments
-        if lr is not None:
-            self.state["lr"].append(lr)
-
-        if update_step_time:
-            self.state["step_time"].append(time.time() - self.step_start_time)
-            self.step_start_time = time.time()
-
-        # Generic Keyword Arguments
-        for key, value in kwargs.items():
-            if key == "loss":
-                loss_val = value.detach()
-                self.state["loss_raw"].append(loss_val)
-                self.state["loss"].append(loss_val)
-            else:
-                self.state[key].append(value.detach())
-
-    @overwatch.rank_zero_only
-    def push(self) -> str:
-        # Note :: Raw Loss is an Average over Gradient Accumulation Steps --> No Smoothing!
-        loss_raw = torch.stack(list(self.state["loss_raw"])).mean().item()
-        loss = torch.stack(list(self.state["loss"])).mean().item()
-        step_time, lr = np.mean(list(self.state["step_time"])), self.state["lr"][-1]
-        status = self.get_status(loss)
-
-        # Fire to Trackers
-        prefix = self.stage.capitalize()
-        self.log(
-            self.global_step,
-            metrics={
-                f"{prefix}/Step": self.global_step,
-                f"{prefix}/Loss": loss,
-                f"{prefix}/Loss (Raw)": loss_raw,
-                f"{prefix}/Learning Rate": lr,
-                f"{prefix}/Step Time": step_time,
-            },
+        # Decode input_ids 为文本（只处理第一个样本）, table_inputs[0] 是 input token IDs
+        prompt_tokens = table_inputs[0]
+        # print("lables[0]", input["input_ids"][0])
+        # print("prompt_tokens", prompt_tokens)
+        if isinstance(prompt_tokens, torch.Tensor):
+            prompt_tokens = prompt_tokens.tolist()
+        prompt_text = vla.llm_backbone.tokenizer.decode(
+            prompt_tokens, skip_special_tokens=True
         )
-        return status
+        table_inputs_decoded = [prompt_text]
+
+        # 处理图像数据（pixel_values 是 dict 格式，key为 'cam1', 'cam2'）
+        # 取两个摄像头的第一个样本并拼接
+        pixel_values = input["pixel_values"]
+
+        # 取 cam1 和 cam2 的第一个样本 [C, H, W]，并在width维度拼接
+        img_tensor = torch.cat(
+            [pixel_values["cam1"][0], pixel_values["cam2"][0]], dim=2
+        )  # [C, H, W*2]
+        # 反向归一化到[0,255]并resize为256x256
+        img_np = img_tensor.cpu().numpy()
+        if img_np.shape[0] == 3:
+            img_np = np.transpose(img_np, (1, 2, 0))  # [H, W, C]
+        img_np = ((img_np + 1) * 255).clip(0, 255).astype(np.uint8)
+
+        # 创建DataFrame记录
+        df = pd.DataFrame(
+            {
+                "prompt": table_inputs_decoded,
+                "pred": [str(table_preds[0])[:100]] if table_preds else ["[无预测]"],
+                "gt": [str(table_gts[0])[:100]] if table_gts else ["[无真值]"],
+            }
+        )
+
+        trackio.log(
+            {
+                f"{prefix}/训练输入输出记录": trackio.Table(dataframe=df),
+                f"{prefix}/图像样本": trackio.Image(img_np),
+            }
+        )
+
+    def get_status(self, loss: Optional[torch.Tensor] = None, lr: float = 0) -> str:
+        return f"=>> [Epoch {self.epoch:03d}] G_Step {self.global_step:06d} =>> Lr:{lr:.6f} - Loss:{loss:.4f}"
 
     def finalize(self) -> str:
-        self.tracker.finalize()
-
+        trackio.finish()

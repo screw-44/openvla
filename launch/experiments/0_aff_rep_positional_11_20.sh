@@ -78,7 +78,7 @@ for COMPRESSION_METHOD in "${COMPRESSION_METHODS[@]}"; do
     echo ""
     
     # 启动训练 - 构建命令
-    TRAIN_CMD="torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} vla-scripts/train.py \
+    TRAIN_CMD="torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} scripts/train.py \
       --mode.type train_validate \
       --mode.is_resume false \
       --mode.validate_interval ${VALIDATE_INTERVAL} \

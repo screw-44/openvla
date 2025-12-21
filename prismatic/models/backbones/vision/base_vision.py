@@ -44,6 +44,11 @@ class LetterboxPad:
 
     def __call__(self, image: Image) -> Image:
         """Given a PIL.Image, pad to square by adding a symmetric border around the height/width."""
+        # HACK： 这里原本支持pil输入，但是hf直接读取出来是tensor，用这种方式hacking修复。
+        # Handle torch.Tensor input (convert to PIL first)
+        if isinstance(image, torch.Tensor):
+            image = TVF.to_pil_image(image)
+        
         (w, h), max_wh = image.size, max(image.size)
         horizontal_pad, vertical_pad = int((max_wh - w) / 2), int((max_wh - h) / 2)
         padding = (horizontal_pad, vertical_pad, horizontal_pad, vertical_pad)
@@ -187,8 +192,24 @@ class TimmViTBackbone(VisionBackbone, ABC):
         return partial(_or_policy, policies=[vit_wrap_policy, transformer_block_policy])
 
     def forward(self, pixel_values: Union[torch.Tensor, Dict[str, torch.Tensor]]) -> torch.Tensor:
-        """Runs transformed image/pixel tensor through vision backbone, returning _all_ patch features."""
-        return self.featurizer(pixel_values)
+        """Runs transformed image/pixel tensor through vision backbone, returning _all_ patch features.
+        
+        支持两种输入：
+        - Single Tensor: [B, 3, H, W] → [B, num_patches, D]
+        - Dict of Tensors: {"cam1": [B, 3, H, W], "cam2": [B, 3, H, W]} → [B, num_patches*n_cams, D]
+          (在patch维度拼接多个摄像头的特征)
+        """
+        if isinstance(pixel_values, dict):
+            # 多摄像头/多模态输入：分别提特征，然后在patch维度拼接
+            features_list = []
+            for key in sorted(pixel_values.keys()):
+                feat = self.featurizer(pixel_values[key])  # [B, num_patches, D]
+                features_list.append(feat)
+            # 在patch维度（dim=1）拼接：[B, num_patches, D] + [B, num_patches, D] = [B, 2*num_patches, D]
+            return torch.cat(features_list, dim=1)
+        else:
+            # 单输入情况：直接通过featurizer
+            return self.featurizer(pixel_values)
 
     @property
     def default_image_resolution(self) -> Tuple[int, int, int]:

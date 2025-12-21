@@ -32,26 +32,25 @@ class BaseTrajectoryCompression(ABC):
 
 @register_trajectory_compression("action_chunk")
 class ActionChunk(BaseTrajectoryCompression):
-    """ 回退到普通vla模式 """
-    def __init__(self, action_chunk_size=50):
+    """ 回退到普通vla模式(默认ac长度为1,测试一下openvla的原始设定) """
+    def __init__(self, action_chunk_size=1):
         self.action_chunk_size = action_chunk_size
+        self.exp_type = "action_chunk"
 
     def __call__(self, trajectory):
         # 确保 trajectory 是 numpy 数组
         if not isinstance(trajectory, np.ndarray):
             trajectory = np.array(trajectory)
         
-        # 如果长度不足，重复最后一个点
-        while len(trajectory) < self.action_chunk_size:
-            # 使用 numpy 的 vstack 或 concatenate 来添加行
-            last_point = trajectory[-1:]  # 保持维度
-            trajectory = np.vstack([trajectory, last_point])
+        # 如果输入是一维（单个action），转换为二维 [1, n_dims]
+        if trajectory.ndim == 1: trajectory = trajectory.reshape(1, -1)
         
         return trajectory[:self.action_chunk_size]  # 截断到指定大小
 
 @register_trajectory_compression("bining")
 class BiningTrajectoryCompression(BaseTrajectoryCompression):
     def __init__(self, target_length: int = 50):
+        self.exp_type = "bining"
         self.target_length = target_length
 
     def __call__(self, trajectory: np.ndarray) -> np.ndarray:
@@ -87,6 +86,7 @@ class UniformBSplineTrajectoryCompression(BaseTrajectoryCompression):
         """
         self.target_length = target_length
         self.degree = degree
+        self.exp_type = "uniform_bspline"
 
     def __call__(self, trajectory: np.ndarray) -> np.ndarray:
         """
@@ -202,7 +202,7 @@ class UniformBSplineTrajectoryCompression(BaseTrajectoryCompression):
 
 @register_trajectory_compression("fix_freq_bining")
 class FixFreqBiningTrajectoryCompression(BaseTrajectoryCompression):
-    def __init__(self, target_length: int = 50):
+    def __init__(self, target_length: int = 60):
         self.target_length = target_length
         self.exp_type = "fix_freq"
     
@@ -215,32 +215,19 @@ class FixFreqBiningTrajectoryCompression(BaseTrajectoryCompression):
             frame_percentage: 起始位置百分比 [0.0, 1.0]，0.0 表示从开头开始
         
         Returns:
-            压缩后的轨迹 [target_length, dim]
+            压缩后的轨迹 [variable_length, dim]（变长，配合EOS token）
         """
         original_length = full_trajectory.shape[0]
         
-        # 如果原始长度不足目标长度，先填充
-        if original_length < self.target_length:
-            last_point = full_trajectory[-1:]
-            num_padding = self.target_length - original_length
-            padding = np.repeat(last_point, num_padding, axis=0)
-            return np.vstack([full_trajectory, padding])
-        
-        # 均匀采样到 target_length 个点
-        indices = np.linspace(0, original_length - 1, num=self.target_length)
+        # NOTE: 12.17 均匀采样（如果原始长度不足target_length，采样到实际长度）
+        actual_length = min(original_length, self.target_length)
+        indices = np.linspace(0, original_length - 1, num=actual_length)
         sampled_trajectory = np.array([full_trajectory[int(idx)] for idx in indices])
         
-        # 根据 frame_percentage 截断
-        start_idx = int(self.target_length * frame_percentage)
-        start_idx = min(start_idx, self.target_length - 1)  # 确保不超出范围
+        # NOTE: 12.17 根据 frame_percentage 截断，不再padding（使用EOS token表示结束）
+        start_idx = int(actual_length * frame_percentage)
+        start_idx = min(start_idx, actual_length - 1)  # 确保不超出范围
         compressed_trajectory = sampled_trajectory[start_idx:]
-        
-        # 如果需要填充
-        if len(compressed_trajectory) < self.target_length:
-            last_point = compressed_trajectory[-1:]
-            num_padding = self.target_length - len(compressed_trajectory)
-            padding = np.repeat(last_point, num_padding, axis=0)
-            compressed_trajectory = np.vstack([compressed_trajectory, padding])
         
         return compressed_trajectory
 
@@ -250,7 +237,7 @@ class FixFreqBiningTrajectoryCompression(BaseTrajectoryCompression):
 # scipy.interpolate.make_lsq_spline(x, y, t, k) 名称：Least-squares B-spline representation（真正的拟合函数）
 @register_trajectory_compression("fix_freq_uniform_bspline")
 class FixFreqUniformBSplineTrajectoryCompression(BaseTrajectoryCompression):
-    def __init__(self, target_length: int = 20, degree: int = 3):
+    def __init__(self, target_length: int = 30, degree: int = 3):
         """
         固定点数和频率的B样条压缩：用固定数量的内部节点来拟合B样条，通过最小二乘法优化控制点。
         采用时间参数化，控制点均匀分布在轨迹上。（模型不需要预测x轴）
@@ -323,17 +310,10 @@ class FixFreqUniformBSplineTrajectoryCompression(BaseTrajectoryCompression):
         # 将控制点组合成 [n_control_points, dim] 的数组
         control_points = np.column_stack(all_control_points)
         
-        # 根据 frame_percentage 截断控制点
+        # NOTE: 12.17 根据 frame_percentage 截断控制点，不再padding（使用EOS token表示结束）
         start_idx = int(n_control_points * frame_percentage)
         start_idx = min(start_idx, n_control_points - 1)  # 确保不超出范围
         control_points = control_points[start_idx:]
-        
-        # 如果需要填充
-        if len(control_points) < n_control_points:
-            last_point = control_points[-1:]
-            num_padding = n_control_points - len(control_points)
-            padding = np.repeat(last_point, num_padding, axis=0)
-            control_points = np.vstack([control_points, padding])
         
         return control_points
     
@@ -895,7 +875,7 @@ if __name__ == "__main__":
         sys.path.insert(0, str(project_root))
     
     from prismatic.vla.tokenizer import DummyTokenizer
-    from Project.Aff.vla.prismatic.vla.dataset import MyLeRobotDataset
+    from prismatic.vla.dataset import MyLeRobotDataset
     
     # 配置日志
     logging.basicConfig(

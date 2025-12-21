@@ -41,13 +41,13 @@ class ModeConfig(ChoiceRegistry):
 
     # === 便捷属性 ===
     @property
-    def is_test(self) -> bool: return self.mode_id == "test"
+    def is_validate(self) -> bool: return "validate" == self.mode_id
+
+    @property
+    def has_validate(self) -> bool: return "validate" in self.mode_id
     
     @property
-    def is_validate(self) -> bool: return "validate" in self.mode_id
-    
-    @property
-    def is_train(self) -> bool: return "train" in self.mode_id
+    def has_train(self) -> bool: return "train" in self.mode_id
 
 
 # === 具体的运行模式配置 ===
@@ -74,9 +74,9 @@ class TrainValidateMode(ModeConfig):
 
 
 @dataclass
-class TestMode(ModeConfig):
+class ValidateMode(ModeConfig):
     """测试模式 - 仅评估不训练"""
-    mode_id: str = "test"
+    mode_id: str = "validate"
 
 
 # === 运行模式注册表 ===
@@ -85,7 +85,7 @@ class ModeRegistry(Enum):
     """运行模式注册表 - 枚举所有可用的运行模式"""
     TRAIN = TrainMode
     TRAIN_VALIDATE = TrainValidateMode
-    TEST = TestMode
+    VALIDATE = ValidateMode
     
     @property
     def mode_id(self) -> str: return self.value().mode_id

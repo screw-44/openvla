@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 实验：Affordance 和表征方式对比实验
-# 日期: 2025-11-17
-# 目标: 测试不同的 affordance 表征方式对模型性能的影响
+# 实验：OpenVLA Baseline 训练
+# 日期: 2025-12-17
+# 目标: 使用标准的 OpenVLA 训练方式，在所有 LIBERO tasks 上训练并测试效果
 # ============================================================================
 
 # 加载基础配置
@@ -15,7 +15,7 @@ init_base_config
 # ============================================================================
 # 实验特定配置
 # ============================================================================
-EXPERIMENT_NAME="aff_representation_251117"
+EXPERIMENT_NAME="baseline_openvla_12_17"
 RUN_ID_NOTE="${EXPERIMENT_NAME}"
 
 # 模型配置
@@ -24,7 +24,7 @@ VLA_TYPE="base"
 # 数据集配置
 DATASET_TYPE="libero"
 DATASET_REPO="HuggingFaceVLA/libero"
-# 注意: TRAJECTORY_COMPRESSION 将在循环中测试多种方法
+DATASET_TASK_IDS="[-1]"  # -1 表示使用所有 tasks
 
 # 训练配置
 SAVE_INTERVAL=1000
@@ -40,21 +40,43 @@ MAX_STEPS="${MAX_STEPS:-}"  # 留空使用 epochs
 # 项目配置
 PROJECT="vla-affordance-experiment"
 
-# 启动训练 - 测试不同的 trajectory_compression 方法
+# ============================================================================
+# 实验说明
+# ============================================================================
+echo "============================================"
+echo "实验: OpenVLA Baseline 训练"
+echo "============================================"
+echo "实验名称: ${EXPERIMENT_NAME}"
+echo "日期: 2025-12-17"
+echo ""
+echo "实验配置:"
+echo "  - VLA Type: ${VLA_TYPE}"
+echo "  - Dataset: ${DATASET_TYPE}"
+echo "  - Task IDs: 所有 tasks ([-1])"
+echo "  - Save Interval: ${SAVE_INTERVAL}"
+echo "  - Validate Interval: ${VALIDATE_INTERVAL}"
+echo "  - Validation Batches: ${NUM_VALIDATION_BATCHES}"
+echo ""
+echo "实验目标:"
+echo "  1. 使用标准的 OpenVLA 训练方式"
+echo "  2. 在所有 LIBERO tasks 上训练模型"
+echo "  3. 测试 action_chunk 方法的效果"
+echo "  4. 为后续实验建立 baseline"
+echo "============================================"
+
+# ============================================================================
+# 启动训练 - OpenVLA Baseline
 # ============================================================================
 cd "${PROJECT_ROOT}"
 
-# 定义要测试的所有 trajectory_compression 方法
+# 使用 action_chunk 作为 trajectory compression 方法（OpenVLA 标准配置）
 COMPRESSION_METHODS=(
-    #"fix_freq_bining"
-    "fix_freq_uniform_bspline"
+    "action_chunk"           # OpenVLA 标准的 action chunking 方法
 )
 
 echo "============================================"
-echo "将依次测试以下 trajectory compression 方法:"
-for method in "${COMPRESSION_METHODS[@]}"; do
-    echo "  - ${method}"
-done
+echo "使用 trajectory compression 方法: action_chunk"
+echo "训练数据: LIBERO 所有 tasks"
 echo "============================================"
 echo ""
 
@@ -71,6 +93,7 @@ for COMPRESSION_METHOD in "${COMPRESSION_METHODS[@]}"; do
     echo "  - Run ID: ${CURRENT_RUN_ID}"
     echo "  - VLA Type: ${VLA_TYPE}"
     echo "  - Dataset: ${DATASET_TYPE}"
+    echo "  - Task IDs: 所有 tasks ([-1])"
     echo "  - Epochs: ${EPOCHS}"
     if [ -n "${MAX_STEPS}" ]; then
         echo "  - Max Steps: ${MAX_STEPS} (overrides epochs)"
@@ -86,16 +109,13 @@ for COMPRESSION_METHOD in "${COMPRESSION_METHODS[@]}"; do
       --vla.type \"${VLA_TYPE}\" \
       --dataset.type \"${DATASET_TYPE}\" \
       --dataset.repo_id \"${DATASET_REPO}\" \
+      --dataset.task_ids [-1] \
       --dataset.trajectory_compression \"${COMPRESSION_METHOD}\" \
       --run_root_dir \"${RUN_ROOT_DIR}\" \
       --run_id_note \"${CURRENT_RUN_ID}\" \
       --save_interval \"${SAVE_INTERVAL}\" \
       --epochs ${EPOCHS} \
-      --project \"${PROJECT}\" \
-      "
-
-      #\
-      # --vla.per_device_batch_size 1
+      --project \"${PROJECT}\""
     
     # 如果设置了 MAX_STEPS，添加该参数
     if [ -n "${MAX_STEPS}" ]; then
@@ -116,13 +136,13 @@ for COMPRESSION_METHOD in "${COMPRESSION_METHODS[@]}"; do
 done
 
 echo "============================================"
-echo "所有 trajectory compression 方法测试完成！"
+echo "OpenVLA Baseline 训练完成！"
 echo "============================================"
 echo ""
-echo "测试的方法:"
-for method in "${COMPRESSION_METHODS[@]}"; do
-    echo "  ✓ ${method}"
-done
+echo "训练配置:"
+echo "  ✓ Compression Method: action_chunk"
+echo "  ✓ Dataset: LIBERO (所有 tasks)"
+echo "  ✓ VLA Type: ${VLA_TYPE}"
 echo ""
 echo "结果保存在: ${RUN_ROOT_DIR}"
 echo "============================================"

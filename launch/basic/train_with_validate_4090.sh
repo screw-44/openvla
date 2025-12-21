@@ -55,7 +55,7 @@ echo "============================================"
 cd "${PROJECT_ROOT}"
 
 # 构建命令参数
-TRAIN_CMD="torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} vla-scripts/train.py \
+TRAIN_CMD="torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} scripts/train.py \
   --mode.type train_validate \
   --mode.is_resume ${IS_RESUME} \
   --mode.pretrained_checkpoint ${PRETRAINED_CHECKPOINT} \
