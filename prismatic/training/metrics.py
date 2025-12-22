@@ -157,7 +157,9 @@ class VLAMetrics:
         img_np = img_tensor.cpu().numpy()
         if img_np.shape[0] == 3:
             img_np = np.transpose(img_np, (1, 2, 0))  # [H, W, C]
-        img_np = ((img_np + 1) * 255).clip(0, 255).astype(np.uint8)
+        img_np = ((img_np*0.5 + 1) * 255).clip(0, 255).astype(np.uint8)
+
+        
 
         # 创建DataFrame记录
         df = pd.DataFrame(
