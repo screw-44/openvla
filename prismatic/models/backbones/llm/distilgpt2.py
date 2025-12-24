@@ -37,7 +37,7 @@ class DistilGPT2Backbone(HFCausalLLMBackbone):
             llm_backbone_id,
             llm_max_length=llm_max_length,
             inference_mode=inference_mode,
-            use_flash_attention_2=True,
+            use_flash_attention_2=False, # 不能开启，gpt2会变成bidirectional的不知道为什么，很沙比（但是训练又受到影响了）
             **DISTILGPT2_MODELS[llm_backbone_id],
         )
 
@@ -63,8 +63,7 @@ class DistilGPT2Backbone(HFCausalLLMBackbone):
 
     @property
     def half_precision_dtype(self) -> torch.dtype:
-        # Train in BF16 where available
-        return torch.bfloat16
+        return torch.float32 # 因为开不了flash attn，采用fp32训练
 
     @property
     def last_layer_finetune_modules(self) -> Sequence[nn.Module]:

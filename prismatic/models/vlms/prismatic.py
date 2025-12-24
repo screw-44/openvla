@@ -356,7 +356,7 @@ class PrismaticVLM(VLM):
         #     past_key_values
         # )
         # 第一次调用是有pixel-values，后续调用是没有的
-        has_valid_past_key_values = past_key_values.get_seq_length() > 0 if past_key_values is not None else None
+        has_valid_past_key_values = past_key_values.get_seq_length() > 0 if past_key_values is not None else False
         
         # Handle Inference (leverage cache, short-circuit on just LLM forward)
         if input_ids.shape[1] == 1 and has_valid_past_key_values:
@@ -392,7 +392,6 @@ class PrismaticVLM(VLM):
                 dtype=attention_mask.dtype,
                 device=attention_mask.device,
             )
-
         # Get Input Embeddings from LLM Backbone :: [bsz, input_seq_len, llm_embed_dim]
         input_embeddings = self.llm_backbone.embed_input_ids(input_ids)
 
@@ -448,9 +447,11 @@ class PrismaticVLM(VLM):
         fused_attention_mask = multimodal_attention_mask
         fused_labels = multimodal_labels
 
-        # print("fused_attention_mask: ", fused_attention_mask[0], "shape:", fused_attention_mask[0].shape)
-        # if labels is not None:
-        #     print("fused_labels:", fused_labels[0], "shape", fused_labels[0].shape)
+        # if overwatch.is_rank_zero():
+        #     print("fused_attention_mask: ", fused_attention_mask[0], "shape:", fused_attention_mask[0].shape)
+        #     print("fused input:", fused_embeddings[0], "shape:", fused_embeddings[0].shape)
+        #     if labels is not None:
+        #         print("fused_labels:", fused_labels[0], "shape", fused_labels[0].shape)
 
         # Run LLM Forward --> returns CausalLMOutputWithPast!
         output = self.llm_backbone(
@@ -487,7 +488,7 @@ class PrismaticVLM(VLM):
 
         # Check if past_key_values contains valid cached data
         # Support both legacy tuple format and DynamicCache format
-        seq_length = past_key_values.get_seq_length()
+        seq_length = past_key_values.get_seq_length() if past_key_values is not None else 0
         has_valid_past_key_values = seq_length > 0
 
         if has_valid_past_key_values:

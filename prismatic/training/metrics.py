@@ -92,7 +92,7 @@ class VLAMetrics:
             )
             pred = predicts[i, pred_start_idx:pred_end_idx]
             print(f"pred: {pred}, gt: {gt}")
-
+            return
             # 1. Token-level accuracy
             total_correct += (pred == gt).sum()
             total_tokens += len(gt)
