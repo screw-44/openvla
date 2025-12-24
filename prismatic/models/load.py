@@ -15,7 +15,7 @@ from prismatic.models.materialize import (
     get_llm_backbone_and_tokenizer,
     get_vision_backbone_and_transform,
 )
-from prismatic.models.vlms import VLA
+from prismatic.models.vlms import VLA, Qwen3VLA
 from prismatic.overwatch import initialize_overwatch
 from prismatic.vla.tokenizer import TRAJECTORY_CONVERTER_REGISTRY
 
@@ -159,6 +159,11 @@ def load(
     Returns:
         OpenVLA model instance with trajectory converter
     """
+    # DEBUG: 打印 VLA 配置信息
+    overwatch.info(f"[DEBUG] vla_cfg type: {type(vla_cfg)}")
+    overwatch.info(f"[DEBUG] vla_cfg.vla_id: {vla_cfg.vla_id}")
+    overwatch.info(f"[DEBUG] vla_cfg.base_vlm: {vla_cfg.base_vlm}")
+
     # Determine which path to use
     model_path = checkpoint_path if checkpoint_path else vla_cfg.base_vlm
 
@@ -194,6 +199,78 @@ def load(
         f"  Checkpoint:       [underline]{checkpoint_safetensors}[/]"
     )
 
+    # Check if this is a Qwen3-VL model (integrated vision-language model)
+    model_id = model_cfg.get("model_id", "")
+    llm_backbone_id = model_cfg.get("llm_backbone_id", "")
+    is_qwen3_vl = (
+        "qwen3-vl" in model_id.lower()
+        or "qwen3-vl" in str(vla_cfg.base_vlm).lower()
+        or "qwen2-vl" in llm_backbone_id.lower()
+    )
+
+    if is_qwen3_vl:
+        # === Qwen3-VL Branch: Integrated vision-language model ===
+        overwatch.info("Detected Qwen3-VL model - using integrated pipeline")
+
+        # Extract model size from vla_cfg or model_id
+        model_size = "2B"  # default
+        if "2b" in str(vla_cfg.base_vlm).lower():
+            model_size = "2B"
+        elif "4b" in str(vla_cfg.base_vlm).lower():
+            model_size = "4B"
+        elif "7b" in str(vla_cfg.base_vlm).lower():
+            model_size = "7B"
+
+        overwatch.info(f"Qwen3-VL model size: {model_size}")
+
+        # Create trajectory converter (using Qwen3's tokenizer will be handled inside Qwen3VLA)
+        # We need a dummy tokenizer first for converter creation
+        from transformers import AutoTokenizer
+
+        try:
+            temp_tokenizer = AutoTokenizer.from_pretrained(
+                "Qwen/Qwen2-VL-2B-Instruct",
+                trust_remote_code=True,
+                local_files_only=True,
+            )
+        except:
+            # Fallback to online
+            temp_tokenizer = AutoTokenizer.from_pretrained(
+                "Qwen/Qwen2-VL-2B-Instruct",
+                trust_remote_code=True,
+            )
+
+        trajectory_converter = create_trajectory_converter(vla_cfg, temp_tokenizer)
+
+        # Initialize Qwen3VLA model
+        if checkpoint_safetensors is not None:
+            # Load from checkpoint
+            vla = Qwen3VLA.from_pretrained(
+                checkpoint_safetensors,
+                model_id=model_cfg.get("model_id", "qwen3-vl"),
+                model_size=model_size,
+                trajectory_converter=trajectory_converter,
+                enable_mixed_precision_training=load_for_training,
+            )
+        else:
+            # Create fresh Qwen3VLA model
+            overwatch.info("No checkpoint found; creating fresh Qwen3-VL model")
+            vla = Qwen3VLA(
+                model_id=model_cfg.get("model_id", "qwen3-vl"),
+                model_size=model_size,
+                trajectory_converter=trajectory_converter,
+                enable_mixed_precision_training=load_for_training,
+            )
+
+        if not load_for_training:
+            overwatch.info("Loading for inference, use evaluation mode.")
+            vla.requires_grad_(False)
+            vla.eval()
+
+        overwatch.info("✅ Successfully loaded Qwen3-VL model")
+        return vla
+
+    # === Standard OpenVLA Branch: Separate vision + LLM + projector ===
     # Load base components (vision + LLM backbones)
     overwatch.info(
         f"Loading Vision Backbone [bold]{model_cfg['vision_backbone_id']}[/]"

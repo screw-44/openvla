@@ -16,13 +16,20 @@ IGNORE_INDEX = -100
 
 def tree_map(fn: Callable, tree: dict) -> dict:
     """Maps a function over a nested dictionary."""
-    return {k: tree_map(fn, v) if isinstance(v, dict) else fn(v) for k, v in tree.items()}
+    return {
+        k: tree_map(fn, v) if isinstance(v, dict) else fn(v) for k, v in tree.items()
+    }
 
 
 def tree_map_with_key(fn: Callable, tree: dict, keys: Sequence = ()) -> dict:
     """Maps a function over a nested dictionary."""
     return {
-        k: tree_map_with_key(fn, v, (*keys, k)) if isinstance(v, dict) else fn((*keys, k), v) for k, v in tree.items()
+        k: (
+            tree_map_with_key(fn, v, (*keys, k))
+            if isinstance(v, dict)
+            else fn((*keys, k), v)
+        )
+        for k, v in tree.items()
     }
 
 
@@ -35,19 +42,30 @@ class PaddedCollatorForLanguageModeling:
     pixel_values_dtype: torch.dtype = torch.float32
 
     def __post_init__(self) -> None:
-        self.dummy_pixel_values = torch.zeros(self.default_image_resolution, dtype=self.pixel_values_dtype)
+        self.dummy_pixel_values = torch.zeros(
+            self.default_image_resolution, dtype=self.pixel_values_dtype
+        )
 
-    def __call__(self, instances: Sequence[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
-        input_ids, labels = tuple([instance[key] for instance in instances] for key in ("input_ids", "labels"))
+    def __call__(
+        self, instances: Sequence[Dict[str, torch.Tensor]]
+    ) -> Dict[str, torch.Tensor]:
+        input_ids, labels = tuple(
+            [instance[key] for instance in instances] for key in ("input_ids", "labels")
+        )
         pixel_values = [instance["pixel_values"] for instance in instances]
 
         # For now, we only support Tokenizers with `padding_side = "right"` during Training (but plan to extend!)
         #   => Handle padding via RNN Utils => `pad_sequence`
-        input_ids = pad_sequence(input_ids, batch_first=True, padding_value=self.pad_token_id)
+        input_ids = pad_sequence(
+            input_ids, batch_first=True, padding_value=self.pad_token_id
+        )
         labels = pad_sequence(labels, batch_first=True, padding_value=IGNORE_INDEX)
 
         # Truncate (if necessary)
-        input_ids, labels = input_ids[:, : self.model_max_length], labels[:, : self.model_max_length]
+        input_ids, labels = (
+            input_ids[:, : self.model_max_length],
+            labels[:, : self.model_max_length],
+        )
 
         # Get `attention_mask` by checking for `pad_token_id`
         attention_mask = input_ids.ne(self.pad_token_id)
@@ -56,16 +74,25 @@ class PaddedCollatorForLanguageModeling:
 
         # Some examples are "language-only" --> build a Tensor of `multimodal_indices` that we can slice into easily
         multimodal_indices = torch.tensor(
-            [idx for idx in range(len(pixel_values)) if pixel_values[idx] is not None], dtype=torch.long
+            [idx for idx in range(len(pixel_values)) if pixel_values[idx] is not None],
+            dtype=torch.long,
         )
 
         # Stack all `pixel_values` --> depending on type (torch.Tensor, or Dict[str, torch.Tensor]) & presence of None
         if len(multimodal_indices) == 0:
-            pixel_values = torch.stack([self.dummy_pixel_values for _ in range(len(input_ids))])
-        elif isinstance(pv_example := pixel_values[multimodal_indices[0]], torch.Tensor):
+            pixel_values = torch.stack(
+                [self.dummy_pixel_values for _ in range(len(input_ids))]
+            )
+        elif isinstance(
+            pv_example := pixel_values[multimodal_indices[0]], torch.Tensor
+        ):
             pixel_values = torch.stack(
                 [
-                    pixel_values[idx] if idx in multimodal_indices else self.dummy_pixel_values
+                    (
+                        pixel_values[idx]
+                        if idx in multimodal_indices
+                        else self.dummy_pixel_values
+                    )
                     for idx in range(len(input_ids))
                 ]
             )
@@ -73,7 +100,11 @@ class PaddedCollatorForLanguageModeling:
             pixel_values = {
                 k: torch.stack(
                     [
-                        pixel_values[idx][k] if idx in multimodal_indices else self.dummy_pixel_values
+                        (
+                            pixel_values[idx][k]
+                            if idx in multimodal_indices
+                            else self.dummy_pixel_values
+                        )
                         for idx in range(len(input_ids))
                     ]
                 )
@@ -95,42 +126,80 @@ class PaddedCollatorForLanguageModeling:
 class PaddedCollatorForActionPrediction:
     model_max_length: int
     pad_token_id: int
-    padding_side: str = "right"
+    padding_side: str = "left"  # 改为 left padding (默认)
     pixel_values_dtype: torch.dtype = torch.float32
 
-    def __call__(self, instances: Sequence[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
-        input_ids, labels = tuple([instance[key] for instance in instances] for key in ("input_ids", "labels"))
+    def __call__(
+        self, instances: Sequence[Dict[str, torch.Tensor]]
+    ) -> Dict[str, torch.Tensor]:
+        input_ids, labels = tuple(
+            [instance[key] for instance in instances] for key in ("input_ids", "labels")
+        )
         pixel_values = [instance["pixel_values"] for instance in instances]
         if "dataset_names" in instances[0]:
             dataset_names = [instance["dataset_names"] for instance in instances]
         else:
             dataset_names = None
         if "prompt_ids_length" in instances[0]:
-            prompt_ids_lengths = torch.stack([instance["prompt_ids_length"] for instance in instances])
+            prompt_ids_lengths = torch.stack(
+                [instance["prompt_ids_length"] for instance in instances]
+            )
         else:
             prompt_ids_lengths = None
 
-        # For now, we only support Tokenizers with `padding_side = "right"` during training
-        #   => Handle padding via RNN Utils => `pad_sequence`
-        assert self.padding_side == "right", f"Invalid Tokenizer `{self.padding_side = }`"
-        input_ids = pad_sequence(input_ids, batch_first=True, padding_value=self.pad_token_id)
-        labels = pad_sequence(labels, batch_first=True, padding_value=IGNORE_INDEX)
+        # Support both left and right padding
+        if self.padding_side == "right":
+            # Right padding: pad_sequence (原有逻辑)
+            input_ids = pad_sequence(
+                input_ids, batch_first=True, padding_value=self.pad_token_id
+            )
+            labels = pad_sequence(labels, batch_first=True, padding_value=IGNORE_INDEX)
+        elif self.padding_side == "left":
+            # Left padding: 手动实现
+            max_len = max(len(ids) for ids in input_ids)
+            max_len = min(max_len, self.model_max_length)
+
+            # 创建 padded tensors
+            batch_size = len(input_ids)
+            padded_input_ids = torch.full(
+                (batch_size, max_len), self.pad_token_id, dtype=input_ids[0].dtype
+            )
+            padded_labels = torch.full(
+                (batch_size, max_len), IGNORE_INDEX, dtype=labels[0].dtype
+            )
+
+            for i, (ids, lbls) in enumerate(zip(input_ids, labels)):
+                seq_len = min(len(ids), max_len)
+                # Left padding: 放在右边
+                padded_input_ids[i, -seq_len:] = ids[:seq_len]
+                padded_labels[i, -seq_len:] = lbls[:seq_len]
+
+            input_ids = padded_input_ids
+            labels = padded_labels
+        else:
+            raise ValueError(f"Invalid padding_side: {self.padding_side}")
 
         # Truncate (if necessary)
-        input_ids, labels = input_ids[:, : self.model_max_length], labels[:, : self.model_max_length]
+        input_ids, labels = (
+            input_ids[:, : self.model_max_length],
+            labels[:, : self.model_max_length],
+        )
 
         # Get `attention_mask` by checking for `pad_token_id`
         attention_mask = input_ids.ne(self.pad_token_id)
 
         # [Contract] For VLA Training =>> No "Unimodal" Data!
-        assert all([pv is not None for pv in pixel_values]), "Invalid VLA Example with `pixel_values = None`!"
+        assert all(
+            [pv is not None for pv in pixel_values]
+        ), "Invalid VLA Example with `pixel_values = None`!"
 
         # Stack all `pixel_values` --> depending on type is torch.Tensor or Dict[str, torch.Tensor]
         if isinstance(pixel_values[0], torch.Tensor):
             pixel_values = torch.stack(pixel_values)
         elif isinstance(pixel_values[0], dict):
             pixel_values = {
-                k: torch.stack([pixel_values[idx][k] for idx in range(len(input_ids))]) for k in pixel_values[0]
+                k: torch.stack([pixel_values[idx][k] for idx in range(len(input_ids))])
+                for k in pixel_values[0]
             }
         else:
             raise ValueError(f"Unsupported `pixel_values` type = {type(pixel_values)}")
