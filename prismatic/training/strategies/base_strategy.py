@@ -167,7 +167,7 @@ class RunStrategy(ABC):
             collate_fn=collator,
             num_workers=DATA_LOADER_NUM_WORKERS,
             worker_init_fn=self.worker_init_fn,
-            shuffle=False,  # NOTE: 这里shuffle是flase
+            shuffle=True,
             pin_memory=True,
             persistent_workers=True,
         )
@@ -184,14 +184,14 @@ class RunStrategy(ABC):
             )
             for batch in step_progress:
                 metrics.global_step += 1
-                batch["input_ids"][0][-8] = 100
-                overwatch.info(
-                    f"training batch: input_ids[0]={batch['input_ids'][0]}, shape={batch['input_ids'][0].shape}, "
-                    f"attention_mask[0]={batch['attention_mask'][0]}, shape {batch['attention_mask'][0].shape}"
-                    f"labels[0]={batch['labels'][0]},  shape {batch['labels'][0].shape}"
-                    # f"cam1={batch['pixel_values']['cam1'][0]} "
-                    # f"cam2[0]={batch['pixel_values']['cam2'][0]}"
-                )
+                # batch["input_ids"][0][-8] = 100
+                # overwatch.info(
+                #     f"training batch: input_ids[0]={batch['input_ids'][0]}, shape={batch['input_ids'][0].shape}, "
+                #     f"attention_mask[0]={batch['attention_mask'][0]}, shape {batch['attention_mask'][0].shape}"
+                #     f"labels[0]={batch['labels'][0]},  shape {batch['labels'][0].shape}"
+                #     # f"cam1={batch['pixel_values']['cam1'][0]} "
+                #     # f"cam2[0]={batch['pixel_values']['cam2'][0]}"
+                # )
                 with torch.autocast(
                     "cuda",
                     dtype=self.mixed_precision_dtype,
@@ -205,7 +205,7 @@ class RunStrategy(ABC):
                     )
                     loss = output.loss
                 loss.backward()  # 反向传播
-                overwatch.info(f"output logits:{output.logits.argmax(dim=2)[0][-10:]}")
+                # overwatch.info(f"output logits:{output.logits.argmax(dim=2)[0][-10:]}")
                 # print("input prompt:", self.model.llm_backbone.tokenizer.decode(input_ids.squeeze(0).tolist()))
                 # generated_ids = generated_ids[0, input_ids.shape[1] :].cpu()
 
@@ -216,8 +216,6 @@ class RunStrategy(ABC):
                         metrics.log_pro(
                             output, batch, self.vla, self.lr_scheduler.get_last_lr()[0]
                         )
-
-                exit()
 
                 # === 梯度更新 ===
                 self.clip_grad_norm()

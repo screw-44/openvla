@@ -30,7 +30,7 @@ class VLAConfig(PreTrainedConfig):
 
     # Optimization Parameters (epochs and max_steps moved to RunConfig in train.py)
     global_batch_size: int = -1                     # Global Batch Size (divided across processes / world size)
-    per_device_batch_size: int = 32                 # Per-Device Batch Size (per-process / individual GPU) of accumulation steps is auto-computed
+    per_device_batch_size: int = 64                 # Per-Device Batch Size (per-process / individual GPU) of accumulation steps is auto-computed
 
     learning_rate: float = 5e-4                     # Peak Learning Rate (`lr_scheduler_type` sets warmup/decay)
     weight_decay: float = 0.001                     # Weight Decay for AdamW Optimizer

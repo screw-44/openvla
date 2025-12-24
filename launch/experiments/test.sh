@@ -15,7 +15,7 @@ init_base_config
 # ============================================================================
 # 测试特定配置
 # ============================================================================
-EXPERIMENT_NAME="1_train2eval"
+EXPERIMENT_NAME="2_train2eval_without_flashattn"
 RUN_ID_NOTE="${EXPERIMENT_NAME}"
 
 # 模型配置
@@ -27,14 +27,14 @@ DATASET_REPO="HuggingFaceVLA/libero"
 TRAJECTORY_COMPRESSION="action_chunk"  # 显式设置轨迹压缩方法
 
 # 训练配置
-SAVE_INTERVAL=100
+SAVE_INTERVAL=500
 
 # 验证配置
 VALIDATE_INTERVAL=500
 NUM_VALIDATION_BATCHES=200 
 
 # 训练周期配置
-EPOCHS=1
+EPOCHS=3
 
 # 项目配置
 PROJECT="test"
@@ -71,7 +71,7 @@ echo ""
 # 启动训练 - 构建命令
 TRAIN_CMD="torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} scripts/train.py \
   --mode.type train_validate \
-  --mode.is_resume true \
+  --mode.is_resume false \
   --mode.validate_interval ${VALIDATE_INTERVAL} \
   --mode.num_validation_batches ${NUM_VALIDATION_BATCHES} \
   --vla.type \"${VLA_TYPE}\" \

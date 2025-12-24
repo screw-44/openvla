@@ -37,8 +37,8 @@ class VLAMetrics:
         self.global_step = 0 if resume_step is None else resume_step
         self.epoch = 0 if resume_epoch is None else resume_epoch
 
-        self.log_freq = 2  # 每记录10次才log一次
-        self.detail_log_freq = 20  # 每100次才详细的log一次
+        self.log_freq = 3  # 每记录10次才log一次
+        self.detail_log_freq = 100  # 每100次才详细的log一次
 
     def log_pro(
         self,
@@ -60,8 +60,8 @@ class VLAMetrics:
             global_step: Current training step (for logging)
         """
         # 按照一定的频率来进行记录（这里比较costly，不全部记录）
-        # if self.global_step % self.log_freq != 0:
-        #     return
+        if self.global_step % self.log_freq != 0:
+            return
 
         # print("keys:", input.keys())
 
@@ -91,8 +91,8 @@ class VLAMetrics:
                 predicts.shape[1] - padding_length - 1,
             )
             pred = predicts[i, pred_start_idx:pred_end_idx]
-            print(f"pred: {pred}, gt: {gt}")
-            return
+            # print(f"pred: {pred}, gt: {gt}")
+            # return
             # 1. Token-level accuracy
             total_correct += (pred == gt).sum()
             total_tokens += len(gt)
