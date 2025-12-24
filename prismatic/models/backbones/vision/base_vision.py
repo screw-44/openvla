@@ -47,6 +47,9 @@ class LetterboxPad:
         # HACK： 这里原本支持pil输入，但是hf直接读取出来是tensor，用这种方式hacking修复。
         # Handle torch.Tensor input (convert to PIL first)
         if isinstance(image, torch.Tensor):
+            # 如果是 4D tensor (batch, C, H, W)，取第一个样本
+            if image.ndim == 4:
+                image = image[0]
             image = TVF.to_pil_image(image)
         
         (w, h), max_wh = image.size, max(image.size)

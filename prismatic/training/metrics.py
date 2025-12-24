@@ -60,8 +60,8 @@ class VLAMetrics:
             global_step: Current training step (for logging)
         """
         # 按照一定的频率来进行记录（这里比较costly，不全部记录）
-        if self.global_step % self.log_freq != 0:
-            return
+        # if self.global_step % self.log_freq != 0:
+        #     return
 
         # print("keys:", input.keys())
 
@@ -91,7 +91,7 @@ class VLAMetrics:
                 predicts.shape[1] - padding_length - 1,
             )
             pred = predicts[i, pred_start_idx:pred_end_idx]
-            # print(f"pred: {pred}, gt: {gt}")
+            print(f"pred: {pred}, gt: {gt}")
 
             # 1. Token-level accuracy
             total_correct += (pred == gt).sum()
@@ -110,6 +110,9 @@ class VLAMetrics:
             table_inputs.append(input["input_ids"][i, :start_idx])
             table_preds.append(pred)
             table_gts.append(gt)
+
+        # print("table_pred:", table_preds[0:5])
+        # print("table_gts:", table_gts[0:5])
 
         token_precision = total_correct / total_tokens
         # print("token precision:", token_precision)
@@ -158,8 +161,6 @@ class VLAMetrics:
         if img_np.shape[0] == 3:
             img_np = np.transpose(img_np, (1, 2, 0))  # [H, W, C]
         img_np = ((img_np*0.5 + 1) * 255).clip(0, 255).astype(np.uint8)
-
-        
 
         # 创建DataFrame记录
         df = pd.DataFrame(

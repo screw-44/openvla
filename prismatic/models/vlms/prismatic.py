@@ -27,6 +27,8 @@ from prismatic.models.vlms.base_vlm import VLM
 from prismatic.overwatch import initialize_overwatch
 from prismatic.util.nn_utils import FusedMLPProjector, LinearProjector, MLPProjector
 
+from transformers import GenerationMixin
+
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
 
@@ -63,13 +65,21 @@ class PrismaticVLM(VLM):
         # Initialize Projection (Adapter) based on `arch_specifier`
         self.arch_specifier = arch_specifier
         if arch_specifier == "linear":
-            self.projector = LinearProjector(vision_backbone.embed_dim, llm_backbone.embed_dim)
+            self.projector = LinearProjector(
+                vision_backbone.embed_dim, llm_backbone.embed_dim
+            )
         elif arch_specifier.endswith("fused-gelu-mlp"):
-            self.projector = FusedMLPProjector(vision_backbone.embed_dim, llm_backbone.embed_dim)
+            self.projector = FusedMLPProjector(
+                vision_backbone.embed_dim, llm_backbone.embed_dim
+            )
         elif arch_specifier.endswith("gelu-mlp"):
-            self.projector = MLPProjector(vision_backbone.embed_dim, llm_backbone.embed_dim)
+            self.projector = MLPProjector(
+                vision_backbone.embed_dim, llm_backbone.embed_dim
+            )
         else:
-            raise ValueError(f"PrismaticVLM with `{arch_specifier = }` is not supported!")
+            raise ValueError(
+                f"PrismaticVLM with `{arch_specifier = }` is not supported!"
+            )
 
         # Trackers
         self.vision_backbone_requires_grad = False
@@ -81,9 +91,15 @@ class PrismaticVLM(VLM):
         # === Generation Utilities ===
         #   => For computing likelihoods --> get tokens corresponding to "True", "False" and "Yes", "No"
         self.string2idx = {}
-        for trigger_string in ["True", "False", "Yes", "No"] + [chr(ord("A") + i) for i in range(26)]:
-            token_idx_list = self.llm_backbone.tokenizer.encode(trigger_string, add_special_tokens=False)
-            assert len(token_idx_list) == 1, f'String "{trigger_string}" is tokenized as more than one token!'
+        for trigger_string in ["True", "False", "Yes", "No"] + [
+            chr(ord("A") + i) for i in range(26)
+        ]:
+            token_idx_list = self.llm_backbone.tokenizer.encode(
+                trigger_string, add_special_tokens=False
+            )
+            assert (
+                len(token_idx_list) == 1
+            ), f'String "{trigger_string}" is tokenized as more than one token!'
             self.string2idx[trigger_string] = token_idx_list[0]
 
     @classmethod
@@ -111,27 +127,24 @@ class PrismaticVLM(VLM):
         # Load checkpoint from safetensors format
         from safetensors import safe_open
         from pathlib import Path
-        
+
         checkpoint_path = Path(pretrained_checkpoint)
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        
+
         # Load from safetensors
         with safe_open(str(checkpoint_path), framework="pt", device=device) as f:
             model_state_dict = {k: f.get_tensor(k) for k in f.keys()}
-        
-        # Reconstruct nested structure from flat keys
+
+        # Reconstruct nested_keys from flat keys 按照这个框架的标准
         nested_state = {}
         for key, tensor in model_state_dict.items():
-            parts = key.split(".")
-            current = nested_state
-            for part in parts[:-1]:
-                if part not in current:
-                    current[part] = {}
-                current = current[part]
-            current[parts[-1]] = tensor
-        
+            start_key = key.split('.')[0]
+            nested_state.setdefault(start_key, {})[key[len(start_key)+1:]] = tensor
+
         assert (
-            "projector" in nested_state and "llm_backbone" in nested_state and "vision_backbone" in nested_state
+            "projector" in nested_state
+            and "llm_backbone" in nested_state
+            and "vision_backbone" in nested_state
         ), "PrismaticVLM `from_pretrained` expects checkpoint with keys for `projector`, 'vision_backbone' AND `llm_backbone`!"
         overwatch.info("Successfully loaded checkpoint from safetensors")
 
@@ -172,9 +185,17 @@ class PrismaticVLM(VLM):
             self.vision_backbone_requires_grad = False
 
             # Explicitly Log Frozen / Trainable Components
-            overwatch.info(f"[Frozen]    🥶 =>> Vision Backbone `{self.vision_backbone.identifier}`", ctx_level=1)
-            overwatch.info(f"[Frozen]    🥶 =>> LLM Backbone `{self.llm_backbone.identifier}`", ctx_level=1)
-            overwatch.info(f"[TRAINABLE] 🔥 =>> Projector `{self.arch_specifier}`", ctx_level=1)
+            overwatch.info(
+                f"[Frozen]    🥶 =>> Vision Backbone `{self.vision_backbone.identifier}`",
+                ctx_level=1,
+            )
+            overwatch.info(
+                f"[Frozen]    🥶 =>> LLM Backbone `{self.llm_backbone.identifier}`",
+                ctx_level=1,
+            )
+            overwatch.info(
+                f"[TRAINABLE] 🔥 =>> Projector `{self.arch_specifier}`", ctx_level=1
+            )
 
         elif stage in {"finetune", "vla-train"}:
             self.vision_backbone.requires_grad_(False)
@@ -188,9 +209,17 @@ class PrismaticVLM(VLM):
             self.vision_backbone_requires_grad = False
 
             # Explicitly Log Frozen / Unfrozen Components
-            overwatch.info(f"[Frozen]    🥶 =>> Vision Backbone `{self.vision_backbone.identifier}`", ctx_level=1)
-            overwatch.info(f"[TRAINABLE] 🔥 =>> LLM Backbone `{self.llm_backbone.identifier}`", ctx_level=1)
-            overwatch.info(f"[TRAINABLE] 🔥 =>> Projector `{self.arch_specifier}`", ctx_level=1)
+            overwatch.info(
+                f"[Frozen]    🥶 =>> Vision Backbone `{self.vision_backbone.identifier}`",
+                ctx_level=1,
+            )
+            overwatch.info(
+                f"[TRAINABLE] 🔥 =>> LLM Backbone `{self.llm_backbone.identifier}`",
+                ctx_level=1,
+            )
+            overwatch.info(
+                f"[TRAINABLE] 🔥 =>> Projector `{self.arch_specifier}`", ctx_level=1
+            )
 
         elif stage in {"full-finetune", "vla-full-train"}:
             self.vision_backbone.dtype = torch.float32
@@ -199,15 +228,27 @@ class PrismaticVLM(VLM):
             self.projector.requires_grad_(True)
 
             # Add to `self.trainable_module_keys`
-            self.trainable_module_keys = ["vision_backbone", "projector", "llm_backbone"]
+            self.trainable_module_keys = [
+                "vision_backbone",
+                "projector",
+                "llm_backbone",
+            ]
 
             # Update Trackers
             self.vision_backbone_requires_grad = True
 
             # Explicitly Log Frozen / Unfrozen Components
-            overwatch.info(f"[TRAINABLE] 🔥 =>> Vision Backbone `{self.vision_backbone.identifier}`", ctx_level=1)
-            overwatch.info(f"[TRAINABLE] 🔥 =>> LLM Backbone `{self.llm_backbone.identifier}`", ctx_level=1)
-            overwatch.info(f"[TRAINABLE] 🔥 =>> Projector `{self.arch_specifier}`", ctx_level=1)
+            overwatch.info(
+                f"[TRAINABLE] 🔥 =>> Vision Backbone `{self.vision_backbone.identifier}`",
+                ctx_level=1,
+            )
+            overwatch.info(
+                f"[TRAINABLE] 🔥 =>> LLM Backbone `{self.llm_backbone.identifier}`",
+                ctx_level=1,
+            )
+            overwatch.info(
+                f"[TRAINABLE] 🔥 =>> Projector `{self.arch_specifier}`", ctx_level=1
+            )
 
         elif stage in {"last-layer-finetune", "vla-last-layer-train"}:
             self.vision_backbone.requires_grad_(False)
@@ -242,7 +283,11 @@ class PrismaticVLM(VLM):
                 module.requires_grad_(True)
 
             # Add to `self.trainable_module_keys`
-            self.trainable_module_keys = ["vision_backbone", "projector", "llm_backbone"]
+            self.trainable_module_keys = [
+                "vision_backbone",
+                "projector",
+                "llm_backbone",
+            ]
 
             # Update Trackers
             self.vision_backbone_requires_grad = True
@@ -255,56 +300,10 @@ class PrismaticVLM(VLM):
             # fmt: on
 
         else:
-            raise ValueError(f"Stage `{stage}` is not supported for LLaVa! Try < align | finetune >")
-
-        overwatch.debug("##################################################")
-        overwatch.debug("#####      Trainable Network Parameters:     #####")
-        overwatch.debug("##################################################")
-        for name, param in self.named_parameters():
-            if param.requires_grad:
-                overwatch.debug(name)
-
-    def load_from_checkpoint(self, stage: str, run_dir: Path, pretrained_checkpoint: Optional[Path] = None) -> None:
-        """Load weights from checkpoint (if required by the given stage)."""
-        assert stage in {"align", "finetune", "full-finetune"}, f"Stage {stage} is not supported!"
-
-        # If we're running a `no-align` architecture, we're good!
-        if self.arch_specifier.startswith("no-align"):
-            overwatch.info(
-                f"PrismaticVLM with `{self.arch_specifier = }` does not require pretrained weights!", ctx_level=1
+            raise ValueError(
+                f"Stage `{stage}` is not supported for LLaVa! Try < align | finetune >"
             )
-            return
 
-        # Otherwise, handle stage-specific logic!
-        if stage == "align":
-            overwatch.info("Stage `align` does not require pretrained weights =>> Starting Training", ctx_level=1)
-            return
-
-        # Otherwise, load from `pretrained_checkpoint` or match on `run_dir` (s/+stage-finetune/+stage-align/g)
-        overwatch.info("Stage `finetune` requires `align` pretrained weights", ctx_level=1)
-
-        # Config specifies path to a checkpoint to load
-        if pretrained_checkpoint is not None:
-            overwatch.info(f"Loading from Provided Checkpoint `{pretrained_checkpoint}`", ctx_level=1)
-            model_state_dict = torch.load(pretrained_checkpoint)["model"]
-            self.projector.load_state_dict(model_state_dict["projector"])
-
-            return
-
-        # [Contract] If no `pretrained_checkpoint`, assume `align` lives in the run directory; string substitution!
-        model, scale, _, seed = run_dir.name.split("+")
-        align_dirs = [
-            d
-            for d in run_dir.parent.iterdir()
-            if (d.name.startswith(f"{model}+{scale}") and d.name.endswith(f"+stage-align+{seed}"))
-        ]
-        assert len(align_dirs) == 1, "Multiple or No Valid Pretrained Directories Exist -- Double Check `runs`!"
-        if (pretrained_checkpoint := (align_dirs[0] / "checkpoints" / "latest-checkpoint.pt")).exists():
-            overwatch.info(f"Loading from Discovered Checkpoint `{pretrained_checkpoint}`", ctx_level=1)
-            model_state_dict = torch.load(pretrained_checkpoint)["model"]
-            self.projector.load_state_dict(model_state_dict["projector"])
-        else:
-            raise ValueError(f"Could not find valid `align` checkpoint at {pretrained_checkpoint}!")
 
     def get_fsdp_wrapping_policy(self) -> Callable:
         """Return an FSDP _or_policy over the policies returned by each individual backbone (and our VLM policy)."""
@@ -332,7 +331,6 @@ class PrismaticVLM(VLM):
     # Note =>> We're not explicitly subclassing `PreTrainedModel` because we don't need the bloat; however, `forward()`
     #          *must* match the signature of a `{Model}ForCausalLM` so that we can inherit from `GenerationMixin`
 
-    # ruff: noqa: C901
     def forward(
         self,
         input_ids: Optional[torch.LongTensor] = None,
@@ -345,47 +343,28 @@ class PrismaticVLM(VLM):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-        multimodal_indices: Optional[torch.LongTensor] = None,
     ) -> CausalLMOutputWithPast:
         """Run a forward pass through the VLM, returning a CausalLMOutputWithPast instance (contains loss)."""
         # Check if past_key_values contains valid cached data
         # Support both legacy tuple format and DynamicCache format
-        has_valid_past_key_values = False
-        if past_key_values is not None:
-            if isinstance(past_key_values, (list, tuple)):
-                has_valid_past_key_values = len(past_key_values) > 0
-            elif hasattr(past_key_values, '__len__'):
-                # DynamicCache or similar cache objects
-                # CRITICAL FIX: Check if cache actually contains data, not just if it exists
-                if hasattr(past_key_values, 'get_seq_length'):
-                    # DynamicCache provides get_seq_length() method
-                    seq_length = past_key_values.get_seq_length()
-                    has_valid_past_key_values = seq_length > 0
-                else:
-                    # Fallback: check if length > 0
-                    has_valid_past_key_values = len(past_key_values) > 0
-            else:
-                has_valid_past_key_values = True  # Unknown cache format, assume valid
-
+        # print(
+        #     "==正在使用这个forward，是调用的了， " "其中pixel_values:",
+        #     pixel_values,
+        #     "\n input_ids:",
+        #     input_ids,
+        #     "\n past_key_values:",
+        #     past_key_values
+        # )
+        # 第一次调用是有pixel-values，后续调用是没有的
+        has_valid_past_key_values = past_key_values.get_seq_length() > 0 if past_key_values is not None else None
+        
         # Handle Inference (leverage cache, short-circuit on just LLM forward)
         if input_ids.shape[1] == 1 and has_valid_past_key_values:
-            # EXPERIMENTAL: Try passing None for attention_mask and let Llama handle it
-            # The issue is that HF passes text-only attention_mask (e.g., 70) but our cache
-            # contains multimodal sequence (e.g., 325). We've been reconstructing it as all 1s,
-            # but maybe we should just pass None and let Llama use default causal attention.
-            if self._forward_call_count <= 2:
-                overwatch.debug(f"  [DEBUG] Cache hit branch - setting attention_mask=None")
-                overwatch.debug(f"  [DEBUG] input_ids shape: {input_ids.shape}")
-                if hasattr(past_key_values, 'get_seq_length'):
-                    overwatch.debug(f"  [DEBUG] past_key_values length: {past_key_values.get_seq_length()}")
-            
-            # Set attention_mask to None - let Llama handle it
-            attention_mask = None
-            
+            assert pixel_values==None, "这里pixel values一定是none"
             # We're leveraging the cache, so just redirect to `self.llm_backbone` with `input_ids` and `past_key_values`
             output = self.llm_backbone(
                 input_ids=input_ids,
-                attention_mask=attention_mask,
+                attention_mask=None, # check this
                 position_ids=None,
                 past_key_values=past_key_values,
                 inputs_embeds=None,
@@ -395,63 +374,20 @@ class PrismaticVLM(VLM):
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
             )
-            
-            # DEBUG: Check if past_key_values is being updated
-            if self._forward_call_count <= 2:
-                if hasattr(output, 'past_key_values') and hasattr(output.past_key_values, 'get_seq_length'):
-                    new_cache_len = output.past_key_values.get_seq_length()
-                    overwatch.debug(f"  [CACHE] Output cache length: {new_cache_len}")
-                
-                # Check logits for the second forward (predicting second action token)
-                if self._forward_call_count == 2:
-                    logits = output.logits
-                    last_logits = logits[0, -1, :]  # Shape: [vocab_size]
-                    action_token_start = 31743
-                    action_token_end = 32000
-                    action_logits = last_logits[action_token_start:action_token_end]
-                    top_values, top_indices = torch.topk(action_logits, k=min(10, len(action_logits)))
-                    top_tokens = top_indices + action_token_start
-                    overwatch.debug(f"  [LOGITS] Second forward - predicting second action token:")
-                    overwatch.debug(f"    Top 5 tokens: {top_tokens[:5].tolist()}")
-                    overwatch.debug(f"    Top 5 logits: {top_values[:5].tolist()}")
-            
             return output
 
-        elif input_ids.shape[1] == 1 or pixel_values is None:
-            raise RuntimeError("Invalid `forward()` call! 这是对于推理时候的，从第二个token开始往后的情况")
-
-        # Handle Multimodal Indices is None --> pretend like the batch is fully multimodal (always image + text)!
-        if multimodal_indices is None:
-            multimodal_indices = torch.arange(len(input_ids), dtype=torch.long, device=input_ids.device)
-
-        # Handle Multimodal Indices is Empty (len == 0) --> simple unimodal forward
-        elif len(multimodal_indices) == 0:
-            return self.llm_backbone(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                position_ids=None,
-                past_key_values=past_key_values,
-                inputs_embeds=None,
-                labels=labels,
-                use_cache=use_cache,
-                output_attentions=output_attentions,
-                output_hidden_states=output_hidden_states,
-                return_dict=return_dict,
-            )
-
-        # Run Visual Feature Extraction
         with torch.set_grad_enabled(self.vision_backbone_requires_grad):
-            if isinstance(pixel_values, dict):
-                patch_features = self.vision_backbone({k: pixel_values[k][multimodal_indices] for k in pixel_values})
-            else:
-                patch_features = self.vision_backbone(pixel_values[multimodal_indices])
+            patch_features = self.vision_backbone(pixel_values)
 
         # Projection Logic :: [bsz, num_patches, llm_embed_dim] =>> num_patches = (2 *) (256 + 1) for ViT-L + CLS
         projected_patch_embeddings = self.projector(patch_features)
         projected_patch_attention_mask = None
         if attention_mask is not None:
             projected_patch_attention_mask = torch.full(
-                (projected_patch_embeddings.shape[0], projected_patch_embeddings.shape[1]),
+                (
+                    projected_patch_embeddings.shape[0],
+                    projected_patch_embeddings.shape[1],
+                ),
                 True,
                 dtype=attention_mask.dtype,
                 device=attention_mask.device,
@@ -463,9 +399,9 @@ class PrismaticVLM(VLM):
         # Build Multimodal Embeddings (and build resulting attention mask)
         multimodal_embeddings = torch.cat(
             [
-                input_embeddings[multimodal_indices, :1, :],
+                input_embeddings[:, :1, :],
                 projected_patch_embeddings,
-                input_embeddings[multimodal_indices, 1:, :],
+                input_embeddings[:, 1:, :],
             ],
             dim=1,
         )
@@ -473,74 +409,48 @@ class PrismaticVLM(VLM):
         if attention_mask is not None:
             multimodal_attention_mask = torch.cat(
                 [
-                    attention_mask[multimodal_indices, :1],
+                    attention_mask[:, :1],
                     projected_patch_attention_mask,
-                    attention_mask[multimodal_indices, 1:],
+                    attention_mask[:, 1:],
                 ],
                 dim=1,
             )
 
-        # 这个删除调
+        # 这个删除调？
         # [Contract] We assume the first token of `labels` (associated with <BOS>) is already marked as "IGNORE"
         #   => We'll ignore the per-token outputs for each of the patch embeddings as well!
         multimodal_labels = None
+        # print("input ids:", input_ids[0])
+        # if labels is not None:
+        #     print("labels: is :", labels[0])
+        # print("attention_map: ", attention_mask[0])
         if labels is not None:
             projected_patch_labels = torch.full(
-                (projected_patch_embeddings.shape[0], projected_patch_embeddings.shape[1]),
+                (
+                    projected_patch_embeddings.shape[0],
+                    projected_patch_embeddings.shape[1],
+                ),
                 IGNORE_INDEX,
                 dtype=labels.dtype,
                 device=labels.device,
             )
             multimodal_labels = torch.cat(
-                [labels[multimodal_indices, :1], projected_patch_labels, labels[multimodal_indices, 1:]], dim=1
+                [
+                    labels[:, :1],
+                    projected_patch_labels,
+                    labels[:, 1:],
+                ],
+                dim=1,
             )
 
         # === Add Unimodal Handling 一个batch中，有的样本是图像+文本。而另外的样本是纯文本，这时候需要进行区分 ===
+        fused_embeddings = multimodal_embeddings
+        fused_attention_mask = multimodal_attention_mask
+        fused_labels = multimodal_labels
 
-        # Create Fused Embeddings, Attention Mask, and Labels by Merging with "unimodal" Inputs (if applicable)
-        unimodal_indices = torch.tensor(
-            [idx for idx in range(len(input_ids)) if idx not in multimodal_indices],
-            dtype=torch.long,
-            device=multimodal_indices.device,
-        )
-
-        # No "unimodal" data --> Fused == Multimodal
-        if len(unimodal_indices) == 0:
-            fused_embeddings = multimodal_embeddings
-            fused_attention_mask = multimodal_attention_mask
-            fused_labels = multimodal_labels
-
-        else: # 这个分支不会走，vla的输出情况一定是有图像+文本（或者纯文本的一个token添加）。不会只有文本。
-            # Otherwise --> Merge w/ unimodal data
-
-            # This doesn't matter --> but in the "normal" case this is the embedding of the <PAD> token
-            #   => NOTE :: Verified that `zeros/randn/empty/<PAD> embedding` all return the same result!
-            unimodal_embeddings_pad = torch.zeros(
-                (len(unimodal_indices), projected_patch_embeddings.shape[1], input_embeddings.shape[2]),
-                dtype=input_embeddings.dtype,
-                device=input_embeddings.device,
-            )
-            unimodal_attention_pad = torch.full(
-                (len(unimodal_indices), projected_patch_embeddings.shape[1]),
-                False,
-                dtype=attention_mask.dtype,
-                device=attention_mask.device,
-            )
-            unimodal_labels_pad = torch.full(
-                (len(unimodal_indices), projected_patch_embeddings.shape[1]),
-                IGNORE_INDEX,
-                dtype=labels.dtype,
-                device=labels.device,
-            )
-
-            unimodal_embeddings = torch.cat([input_embeddings[unimodal_indices], unimodal_embeddings_pad], dim=1)
-            unimodal_attention_mask = torch.cat([attention_mask[unimodal_indices], unimodal_attention_pad], dim=1)
-            unimodal_labels = torch.cat([labels[unimodal_indices], unimodal_labels_pad], dim=1)
-
-            # Create "Fused" Tensors by Stacking Multimodal & Unimodal
-            fused_embeddings = torch.vstack([multimodal_embeddings, unimodal_embeddings])
-            fused_attention_mask = torch.vstack([multimodal_attention_mask, unimodal_attention_mask])
-            fused_labels = torch.vstack([multimodal_labels, unimodal_labels])
+        # print("fused_attention_mask: ", fused_attention_mask[0], "shape:", fused_attention_mask[0].shape)
+        # if labels is not None:
+        #     print("fused_labels:", fused_labels[0], "shape", fused_labels[0].shape)
 
         # Run LLM Forward --> returns CausalLMOutputWithPast!
         output = self.llm_backbone(
@@ -555,7 +465,7 @@ class PrismaticVLM(VLM):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        
+
         return output
 
     # === GenerationMixin Methods ===
@@ -569,57 +479,23 @@ class PrismaticVLM(VLM):
         attention_mask: Optional[torch.Tensor] = None,
         pixel_values: Optional[torch.FloatTensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
-        past_key_values: Optional[List[torch.FloatTensor]] = None,
+        past_key_values: Optional[List[torch.FloatTensor]] = None, # 认为这个参数会被赋值
         use_cache: Optional[bool] = None,
         **kwargs: torch.Tensor,
     ) -> Dict[str, torch.Tensor]:
         """Borrowed from `LlamaForCausalLM` --> in general, just handles caching logic during generation."""
-        
-        # DEBUG: overwatch.debug prepare_inputs details
-        if not hasattr(self, '_prepare_call_count'):
-            self._prepare_call_count = 0
-        self._prepare_call_count += 1
-        
-        if self._prepare_call_count <= 2:
-            overwatch.debug(f"\n[prepare_inputs_for_generation] Call #{self._prepare_call_count}")
-            overwatch.debug(f"  input_ids shape: {input_ids.shape if input_ids is not None else None}")
-            overwatch.debug(f"  attention_mask shape (before): {attention_mask.shape if attention_mask is not None else None}")
-            overwatch.debug(f"  past_key_values type: {type(past_key_values)}")
-            overwatch.debug(f"  past_key_values is None: {past_key_values is None}")
-            if past_key_values is not None:
-                if hasattr(past_key_values, '__len__'):
-                    overwatch.debug(f"  past_key_values len: {len(past_key_values)}")
-                # Check if cache is empty (DynamicCache with get_seq_length)
-                if hasattr(past_key_values, 'get_seq_length'):
-                    seq_len = past_key_values.get_seq_length()
-                    overwatch.debug(f"  past_key_values seq_length: {seq_len}")
-        
+
         # Check if past_key_values contains valid cached data
         # Support both legacy tuple format and DynamicCache format
-        has_valid_past_key_values = False
-        if past_key_values is not None:
-            if isinstance(past_key_values, (list, tuple)):
-                has_valid_past_key_values = len(past_key_values) > 0
-            elif hasattr(past_key_values, '__len__'):
-                # DynamicCache or similar cache objects
-                # CRITICAL FIX: Check if cache actually contains data, not just if it exists
-                # HF's generate() may create an empty DynamicCache initially
-                if hasattr(past_key_values, 'get_seq_length'):
-                    # DynamicCache provides get_seq_length() method
-                    seq_length = past_key_values.get_seq_length()
-                    has_valid_past_key_values = seq_length > 0
-                else:
-                    # Fallback: check if length > 0
-                    has_valid_past_key_values = len(past_key_values) > 0
-            else:
-                has_valid_past_key_values = True  # Unknown cache format, assume valid
+        seq_length = past_key_values.get_seq_length()
+        has_valid_past_key_values = seq_length > 0
 
         if has_valid_past_key_values:
             input_ids = input_ids[:, -1:]
             # Once we have valid past_key_values, we don't need pixel_values anymore
             # Vision tokens are already encoded in the KV cache
             pixel_values = None
-            
+
             # NOTE: We do NOT update attention_mask here because HF's GenerationMixin
             # passes attention_mask with text-only length (e.g., 70), but our cache
             # contains multimodal tokens (text + vision patches, e.g., 325).
@@ -644,114 +520,61 @@ class PrismaticVLM(VLM):
 
         return model_inputs
 
+    # 删除了，实际不会有这种情况
+    def load_from_checkpoint(
+        self, stage: str, run_dir: Path, pretrained_checkpoint: Optional[Path] = None
+    ) -> None:
+        raise NotImplementedError
 
-    @torch.inference_mode()
-    def generate_ids(self, image: Image, prompt_text: str, **kwargs: str) -> torch.LongTensor:
-         # For now, only support generation with a batch size of 1 for simplicity
-        image_transform, tokenizer = self.vision_backbone.image_transform, self.llm_backbone.tokenizer
-
-        # Prepare Inputs
-        input_ids = tokenizer(prompt_text, truncation=True, return_tensors="pt").input_ids.to(self.device)
-        pixel_values = image_transform(image)
-        if isinstance(pixel_values, torch.Tensor):
-            pixel_values = pixel_values[None, ...].to(self.device)
-        elif isinstance(pixel_values, dict):
-            pixel_values = {k: v[None, ...].to(self.device) for k, v in pixel_values.items()}
-        else:
-            raise ValueError(f"Unsupported `pixel_values` type = {type(pixel_values)}")
-
-        # Invoke super().generate --> taps into `GenerationMixin` which (redirects) to `forward()`
-        autocast_dtype = self.llm_backbone.half_precision_dtype
-        with torch.autocast("cuda", dtype=autocast_dtype, enabled=self.enable_mixed_precision_training):
-            generated_ids = super().generate(
-                input_ids=input_ids,            # Shape: [1, seq]
-                pixel_values=pixel_values,      # Shape: [1, 3, res, res] or Dict[str, Shape[1, 3, res, res]]
-                **kwargs
-            )
-        return generated_ids
-
-
-    @torch.inference_mode()
-    def generate(self, image: Image, prompt_text: str, **kwargs: str) -> str:
-        generated_ids = self.generate_ids(image, prompt_text, **kwargs)
-
-        tokenizer = self.llm_backbone.tokenizer
-        input_ids = tokenizer(prompt_text, truncation=True, return_tensors="pt").input_ids.to(self.device)
-
-        generated_text = tokenizer.decode(generated_ids[0, input_ids.shape[1] :], skip_special_tokens=True).strip()
-        return generated_text
-
-
+    # 把generate的部分删除调了，训练直接用forward，推理在modeling vla里面。
 
     # @torch.inference_mode()
-    # def generate_batch(
-    #     self,
-    #     pixel_values: Union[torch.Tensor, Dict[str, torch.Tensor]],
-    #     texts: List[str],
-    #     return_string_probabilities: Optional[List[str]] = None,
-    #     **kwargs: str,
-    # ) -> Union[List[str], List[List[float]]]:
+    # def generate_ids(
+    #     self, image: Image, prompt_text: str, **kwargs: str
+    # ) -> torch.LongTensor:
     #     # For now, only support generation with a batch size of 1 for simplicity
-    #     tokenizer = self.llm_backbone.tokenizer
+    #     image_transform, tokenizer = (
+    #         self.vision_backbone.image_transform,
+    #         self.llm_backbone.tokenizer,
+    #     )
 
     #     # Prepare Inputs
-    #     batch_input_ids = [
-    #         tokenizer(text, truncation=True, return_tensors="pt").input_ids.to(self.device) for text in texts
-    #     ]
+    #     input_ids = tokenizer(
+    #         prompt_text, truncation=True, return_tensors="pt"
+    #     ).input_ids.to(self.device)
+    #     pixel_values = image_transform(image)
     #     if isinstance(pixel_values, torch.Tensor):
     #         pixel_values = pixel_values[None, ...].to(self.device)
     #     elif isinstance(pixel_values, dict):
-    #         pixel_values = {k: v[None, ...].to(self.device) for k, v in pixel_values.items()}
+    #         pixel_values = {
+    #             k: v[None, ...].to(self.device) for k, v in pixel_values.items()
+    #         }
     #     else:
     #         raise ValueError(f"Unsupported `pixel_values` type = {type(pixel_values)}")
 
-    #     # Create Output Lists
-    #     gen_texts, gen_probabilities = [], []
-
     #     # Invoke super().generate --> taps into `GenerationMixin` which (redirects) to `forward()`
     #     autocast_dtype = self.llm_backbone.half_precision_dtype
-    #     with torch.autocast("cuda", dtype=autocast_dtype, enabled=self.enable_mixed_precision_training):
-    #         for idx, input_ids in enumerate(batch_input_ids):
-    #             if isinstance(pixel_values, torch.Tensor):
-    #                 pixel_values = pixel_values[idx]
-    #             elif isinstance(pixel_values, dict):
-    #                 pixel_values = {k: pixel_values[k][idx] for k in pixel_values}
-    #             else:
-    #                 raise ValueError(f"Unsupported `pixel_values` type = {type(pixel_values)}")
+    #     with torch.autocast(
+    #         "cuda", dtype=autocast_dtype, enabled=self.enable_mixed_precision_training
+    #     ):
+    #         generated_ids = super().generate(
+    #             input_ids=input_ids,  # Shape: [1, seq]
+    #             pixel_values=pixel_values,  # Shape: [1, 3, res, res] or Dict[str, Shape[1, 3, res, res]]
+    #             **kwargs,
+    #         )
+    #     return generated_ids
 
-    #             # Handle `return_string_probabilities`
-    #             if return_string_probabilities is None:
-    #                 full_out_ids = super().generate(input_ids=input_ids, pixel_values=pixel_values, **kwargs)
-    #                 gen_ids = full_out_ids[0, input_ids.shape[1] :]
+    # @torch.inference_mode()
+    # def generate(self, image: Image, prompt_text: str, **kwargs: str) -> str:
+    #     generated_ids = self.generate_ids(image, prompt_text, **kwargs)
 
-    #                 # Decode `gen_ids` and strip any <EOS> tokens
-    #                 gen_texts.append(tokenizer.decode(gen_ids, skip_special_tokens=True).strip())
+    #     tokenizer = self.llm_backbone.tokenizer
+    #     input_ids = tokenizer(
+    #         prompt_text, truncation=True, return_tensors="pt"
+    #     ).input_ids.to(self.device)
 
-    #             else:
-    #                 full_out_dict = super().generate(
-    #                     input_ids=input_ids,
-    #                     pixel_values=pixel_values,
-    #                     output_scores=True,
-    #                     return_dict_in_generate=True,
-    #                     **kwargs,
-    #                 )
+    #     generated_text = tokenizer.decode(
+    #         generated_ids[0, input_ids.shape[1] :], skip_special_tokens=True
+    #     ).strip()
+    #     return generated_text
 
-    #                 # Generation pattern should usually be [TOKEN] <EOS> for True/False and Yes/No Generations
-    #                 gen_ids = full_out_dict.sequences[0, input_ids.shape[1] :]
-
-    #                 # [Debug] Verify that the first token generated is in `self.string2idx.values()`
-    #                 # assert gen_ids[0] in self.string2idx.values(), "Generated ID not in mapping!"
-
-    #                 # Decode `gen_ids` and strip any <EOS> tokens
-    #                 gen_texts.append(tokenizer.decode(gen_ids, skip_special_tokens=True).strip())
-
-    #                 # Get all token probabilities --> softmax over logits
-    #                 token_probs = torch.softmax(full_out_dict.scores[0][0], dim=0)
-
-    #                 # Get *normalized* probabilities for all values in `return_token_probabilities`
-    #                 slice_idxs = torch.tensor([self.string2idx[s] for s in return_string_probabilities])
-    #                 string_probs_unnormalized = token_probs[slice_idxs]
-    #                 string_probs = string_probs_unnormalized / string_probs_unnormalized.sum()
-    #                 gen_probabilities.append(string_probs.cpu().numpy().tolist())
-
-    #     return gen_texts if return_string_probabilities is None else gen_probabilities

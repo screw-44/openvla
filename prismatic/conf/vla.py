@@ -1,47 +1,44 @@
 """
 vla.py
 
+注意这个里面的参数除了需要满足训练的需求，还有hugginface的代码来进行推理
+
 Draccus Dataclass Definition for a VLAConfig object, with various registered subclasses for each VLA experiment and
-model configuration thereof. A given VLA model (`policy`) configures the following attributes:
-    - Data Mixture (e.g., Bridge, OXE_MAGIC_SOUP, etc.)
-    - Base VLM from Prismatic Registry (e.g., `prism-dinosiglip+7b`)
-    - VLA Model Architecture / Parameters (e.g., freeze vision encoder, last layer finetuning)
-    - Training / Optimization Hyperparameters
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, unique
 from pathlib import Path
 from typing import Optional, Union
 
 import torch
-from draccus import ChoiceRegistry
 
 
+from lerobot.configs.policies import PreTrainedConfig
+
+
+# 尝试只注册夫类来实现
+@PreTrainedConfig.register_subclass("vla")
 @dataclass
-class VLAConfig(ChoiceRegistry):
+class VLAConfig(PreTrainedConfig):
     # fmt: off
-    vla_id: str                                     # Unique VLA Policy ID that fully specifies a configuration variant
-    base_vlm: Union[str, Path]                      # Base VLM as ID/Path to Run Directory (e.g., `prism-dinosiglip+7b`)
-    freeze_vision_backbone: bool                    # Freeze Vision Backbone Parameters (akin to pretraining)
-    freeze_llm_backbone: bool                       # Freeze LLM Backbone parameters
-    unfreeze_last_llm_layer: bool                   # Unfreeze final layer of LLM (only takes effect if LLM is frozen)
-
-    # Data Mixture Parameters
-    shuffle_buffer_size: int                        # Size of Shuffle Buffer (100K for Bridge, 1M for OXE)
+    vla_id: str = "base"                            # Unique VLA Policy ID that fully specifies a configuration variant
+    base_vlm: Union[str, Path] = "distilgpt2"  # Base VLM as ID/Path to Run Directory
+    freeze_vision_backbone: bool = True             # Freeze Vision Backbone Parameters (akin to pretraining)
+    freeze_llm_backbone: bool = False               # Freeze LLM Backbone parameters
+    unfreeze_last_llm_layer: bool = False           # Unfreeze final layer of LLM (only takes effect if LLM is frozen)
 
     # Optimization Parameters (epochs and max_steps moved to RunConfig in train.py)
-    global_batch_size: int                          # Global Batch Size (divided across processes / world size)
-    per_device_batch_size: int                      # Per-Device Batch Size (per-process / individual GPU)
-                                                    #   =>> # of accumulation steps is auto-computed
+    global_batch_size: int = -1                     # Global Batch Size (divided across processes / world size)
+    per_device_batch_size: int = 32                 # Per-Device Batch Size (per-process / individual GPU) of accumulation steps is auto-computed
 
-    learning_rate: float                            # Peak Learning Rate (`lr_scheduler_type` sets warmup/decay)
-    weight_decay: float                             # Weight Decay for AdamW Optimizer
-    max_grad_norm: float                            # Max Grad Norm (for global gradient clipping)
-    lr_scheduler_type: str                          # LR Scheduler (usually: "constant" | "linear-warmup+cosine-decay")
-    warmup_ratio: float                             # Fraction of Steps to Warmup (for warmup LR schedulers)
+    learning_rate: float = 5e-4                     # Peak Learning Rate (`lr_scheduler_type` sets warmup/decay)
+    weight_decay: float = 0.001                     # Weight Decay for AdamW Optimizer
+    max_grad_norm: float = 2.0                      # Max Grad Norm (for global gradient clipping)
+    lr_scheduler_type: str = "linear-warmup+cosine-decay"  # LR Scheduler (usually: "constant" | "linear-warmup+cosine-decay")
+    warmup_ratio: float = 0.01                      # Fraction of Steps to Warmup (for warmup LR schedulers)
 
-    train_strategy: str                             # Train Strategy (default "fsdp-full-shard")
+    train_strategy: str = "fsdp-full-shard"         # Train Strategy (default "fsdp-full-shard")
 
     # Enable Gradient/Activation Checkpointing (for the LLM Backbone)
     enable_gradient_checkpointing: bool = True      # Enable Gradient/Activation Checkpointing during Training
@@ -50,10 +47,20 @@ class VLAConfig(ChoiceRegistry):
     enable_mixed_precision_training: bool = True    # Enable Traditional BF16 Mixed Precision
     reduce_in_full_precision: bool = True           # Accumulate/Reduce All-Gather Gradients in FP32 Full Precision
 
-    # Trajectory Converter Configuration
+    # Trajectory Configuration
+    trajectory_compression: str = "bining"          # Trajectory compression method (e.g., 'bining', 'action_chunk', 'uniform_bspline')
     trajectory_converter_type: str = 'value_textualize'  # Converter type for action discretization
     trajectory_n_bins: int = 256                    # Number of bins for discretization
     trajectory_n_dims: int = 7                      # Action dimensions (e.g., 7DOF for Libero)
+
+    ### ===== 推理部分的代码（hf lerobot） ======
+    type: str = "vla"
+    action_dim: int = 7
+    action_horizon: int = 1
+    observation_horizon: int = 1
+    vision_backbone: str = "siglip-vit-so400m-14-384"
+    llm_backbone: str = "distilgpt2"
+    model_config: dict = field(default_factory=dict) # Model Configuration (serialized from checkpoint)
 
     # fmt: on
 
@@ -68,37 +75,30 @@ class VLAConfig(ChoiceRegistry):
             num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 1
             self.global_batch_size = self.per_device_batch_size * num_gpus
 
+    @property
+    def observation_delta_indices(self) -> list | None:
+        return None
 
-# === [1 GPU] Lightweight Custom Trajectory Training ===
-@dataclass
-class Base(VLAConfig):
-    vla_id: str = "base"
-    base_vlm: Union[str, Path] = "TRI-ML/prismatic-vlms/siglip-224px+7b"
+    @property
+    def action_delta_indices(self) -> list | None:
+        return None
 
-    freeze_vision_backbone: bool = True
-    freeze_llm_backbone: bool = False
-    unfreeze_last_llm_layer: bool = False
-    shuffle_buffer_size: int = 256_000  # Smaller buffer for lightweight training
+    @property
+    def reward_delta_indices(self) -> list | None:
+        return None
 
-    # H100 Settings
-    # Note: global_batch_size = -1 means auto-compute: per_device_batch_size * number_of_gpus
-    global_batch_size: int = -1  # Auto-computed in __post_init__
-    per_device_batch_size: int = 32
+    def get_optimizer_preset(self) -> None:
+        return None
 
-    learning_rate: float = 5e-4  # Slightly higher LR for faster convergence
-    weight_decay: float = 0.001  # Add some regularization
-    max_grad_norm: float = 2.0
-    lr_scheduler_type: str = "linear-warmup+cosine-decay"
-    warmup_ratio: float = 0.01  # 0.0001     # 0.01% warmup
+    def get_scheduler_preset(self) -> None:
+        return None
 
-    train_strategy: str = "fsdp-full-shard"
-
-    use_flash_attention_2: bool = True
-    enable_mixed_precision_training: bool = True
+    def validate_features(self) -> None:
+        return None
 
 
 @dataclass
-class Base_4090(Base):
+class Base_4090Config(VLAConfig):
     vla_id: str = "base_4090"
 
     freeze_vision_backbone: bool = True
@@ -110,7 +110,7 @@ class Base_4090(Base):
 
 # === Debug Models for Fast Iteration ===
 @dataclass
-class DistilGPT2(Base):
+class DistilGPT2Config(VLAConfig):
     vla_id: str = "distilgpt2"
     base_vlm: Union[str, Path] = "distilgpt2"
 
@@ -118,17 +118,17 @@ class DistilGPT2(Base):
     freeze_llm_backbone: bool = False
     unfreeze_last_llm_layer: bool = True
 
-    learning_rate: float = 5e-4  # Slightly higher LR for faster convergence
     warmup_ratio: float = 0.01  # 0.01% warmup
+    learning_rate: float = 5e-4  # Slightly higher LR for faster convergence
     weight_decay: float = 0.001
     # Very small batch for quick testing
-    per_device_batch_size: int = 64
+    per_device_batch_size: int =  64
     global_batch_size: int = -1  # Auto-compute
 
 
 # === Qwen3-VL Models ===
 @dataclass
-class Qwen3VL_2B(Base):
+class Qwen3VL_2BConfig(VLAConfig):
     vla_id: str = "qwen3-vl-2b"
     base_vlm: Union[str, Path] = "qwen3-vl-2b"
 
@@ -141,14 +141,14 @@ class Qwen3VL_2B(Base):
 
 
 @dataclass
-class Qwen3VL_7B(Qwen3VL_2B):
+class Qwen3VL_7BConfig(Qwen3VL_2BConfig):
     vla_id: str = "qwen3-vl-7b"
     base_vlm: Union[str, Path] = "qwen3-vl-7b"
     per_device_batch_size: int = 16
 
 
 @dataclass
-class Qwen3VL_4B(Qwen3VL_2B):
+class Qwen3VL_4BConfig(Qwen3VL_2BConfig):
     vla_id: str = "qwen3-vl-4b"
     base_vlm: Union[str, Path] = "qwen3-vl-4b"
     per_device_batch_size: int = 16
@@ -157,17 +157,17 @@ class Qwen3VL_4B(Qwen3VL_2B):
 # === Define a VLA Registry Enum for Reference & Validation ===
 @unique
 class VLARegistry(Enum):
+    VLA = VLAConfig
     # === Custom Trajectory Training ===
-    Base = Base
-    Base_4090 = Base_4090
+    Base_4090 = Base_4090Config
 
     # === Debug Models ===
-    DISTILGPT2 = DistilGPT2
+    DISTILGPT2 = DistilGPT2Config
 
     # === Qwen3-VL Models ===
-    QWEN3_VL_2B = Qwen3VL_2B
-    QWEN3_VL_7B = Qwen3VL_7B
-    QWEN3_VL_4B = Qwen3VL_4B
+    QWEN3_VL_2B = Qwen3VL_2BConfig
+    QWEN3_VL_7B = Qwen3VL_7BConfig
+    QWEN3_VL_4B = Qwen3VL_4BConfig
 
     @property
     def vla_id(self) -> str:

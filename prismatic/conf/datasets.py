@@ -10,7 +10,7 @@ datasets.py
 使用方式：
     在 RunConfig 中作为嵌套字段:
     dataset: DatasetConfig = field(default_factory=...)
-    
+
     CLI 使用:
     --dataset.type libero
     --dataset.repo_id "HuggingFaceVLA/libero"
@@ -28,17 +28,15 @@ from draccus import ChoiceRegistry
 @dataclass
 class DatasetConfig(ChoiceRegistry):
     """数据集配置基类"""
-    dataset_id: str                                             # 数据集唯一标识符
-    
+
+    dataset_id: str  # 数据集唯一标识符
+
     # === Dataset Source ===
-    repo_id: Union[str, Path] = "HuggingFaceVLA/libero"        # HF Dataset repo ID 或本地路径
-    
+    repo_id: Union[str, Path] = "HuggingFaceVLA/libero"  # HF Dataset repo ID 或本地路径
+
     # === Task Selection ===
-    task_ids: Optional[List[int]] = None                        # Task IDs to include (None = all tasks)
-    
-    # === Trajectory Compression ===
-    trajectory_compression: str = "bining"                      # Trajectory compression method
-    
+    task_ids: Optional[List[int]] = None  # Task IDs to include (None = all tasks)
+
     def get_task_ids(self) -> Optional[List[int]]:
         """
         获取任务 ID 列表。
@@ -50,48 +48,48 @@ class DatasetConfig(ChoiceRegistry):
 
 # === 具体的数据集配置 ===
 
+
 @dataclass
 class LiberoDataset(DatasetConfig):
     """Libero 数据集配置"""
+
     dataset_id: str = "libero"
     repo_id: Union[str, Path] = "HuggingFaceVLA/libero"
     task_ids: Optional[List[int]] = None
-    trajectory_compression: str = "bining"
 
 
 @dataclass
 class CustomTrajectoryDataset(DatasetConfig):
     """自定义轨迹数据集配置 - 用于手-物体交互等任务"""
+
     dataset_id: str = "custom_trajectory"
-    repo_id: Union[str, Path] = "local/custom_trajectory"      # 默认本地路径
+    repo_id: Union[str, Path] = "local/custom_trajectory"  # 默认本地路径
     task_ids: Optional[List[int]] = None
-    trajectory_compression: str = "bining"
 
 
 @dataclass
 class BridgeDataset(DatasetConfig):
     """Bridge 数据集配置"""
+
     dataset_id: str = "bridge"
     repo_id: Union[str, Path] = "HuggingFaceVLA/bridge"
     task_ids: Optional[List[int]] = None
-    trajectory_compression: str = "bining"
 
 
 # === 数据集注册表 ===
 @unique
 class DatasetRegistry(Enum):
     """数据集注册表 - 枚举所有可用的数据集配置"""
+
     LIBERO = LiberoDataset
     CUSTOM_TRAJECTORY = CustomTrajectoryDataset
     BRIDGE = BridgeDataset
-    
+
     @property
     def dataset_id(self) -> str:
         return self.value().dataset_id
 
 
-
 # 注册所有数据集配置到 ChoiceRegistry
 for dataset_variant in DatasetRegistry:
     DatasetConfig.register_subclass(dataset_variant.dataset_id, dataset_variant.value)
-

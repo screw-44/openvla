@@ -6,6 +6,7 @@ train.py
 import re
 import os
 import sys
+import json
 
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -27,7 +28,7 @@ from prismatic.models import load
 from prismatic.overwatch import initialize_overwatch
 from prismatic.training import VLAMetrics, get_train_strategy
 from prismatic.util import set_global_seed
-from prismatic.vla import get_vla_dataset_and_collator
+from prismatic.util.vla_utils import get_vla_dataset
 from utils.training_utils import find_latest_checkpoint, warmup_trainig
 
 local_rank = warmup_trainig()
@@ -43,7 +44,7 @@ class RunConfig:
     )
     # === VLA Model Configuration（嵌套 ChoiceRegistry）===
     vla: VLAConfig = field(
-        default_factory=VLAConfig.get_choice_class(VLARegistry.Base.vla_id)
+        default_factory=VLAConfig.get_choice_class(VLARegistry.VLA.vla_id)
     )
     # === Dataset Configuration（嵌套 ChoiceRegistry）===
     dataset: DatasetConfig = field(
@@ -86,9 +87,11 @@ def train(cfg: RunConfig) -> None:
     os.makedirs(run_dir := (cfg.run_root_dir / cfg.run_id), exist_ok=True)
     os.makedirs(cfg.run_root_dir / cfg.run_id / "checkpoints", exist_ok=True)
 
-    # Save Configuration
+    # Save Configuration (as JSON) - only save full config, not VLA config alone
+    # (因为eval.py期望EvalConfig，而不是VLAConfig，所以只保存train_config.json)
     if overwatch.is_rank_zero():
-        draccus.dump(cfg, open(run_dir / "train_config.yml", "w"))
+        with open(run_dir / "train_config.json", "w") as f:
+            json.dump(draccus.encode(cfg), f, indent=2)
 
     # 加载模型
     checkpoint_to_load = None
@@ -143,17 +146,16 @@ def train(cfg: RunConfig) -> None:
 
     # Get VLA Dataset & Collator
     overwatch.info(f"Creating VLA Dataset. ")
-    vla_dataset, trajectory_converter, collator = get_vla_dataset_and_collator(
+    vla_dataset, trajectory_converter, collator = get_vla_dataset(
         data_repo_id=cfg.dataset.repo_id,
         data_task_ids=cfg.dataset.get_task_ids(),
-        trajectory_compression_method=cfg.dataset.trajectory_compression,
+        trajectory_compression_method=cfg.vla.trajectory_compression,
         trajectory_converter_type=cfg.vla.trajectory_converter_type,
         trajectory_n_bins=cfg.vla.trajectory_n_bins,
         trajectory_n_dims=cfg.vla.trajectory_n_dims,
         base_tokenizer=vla.llm_backbone.get_tokenizer(),
         prompt_builder_fn=vla.llm_backbone.prompt_builder_fn,
         image_transform=vla.vision_backbone.get_image_transform(),
-        default_image_resolution=vla.vision_backbone.default_image_resolution,
     )
 
     # Extract resume_step and resume_epoch from checkpoint path if resuming

@@ -20,21 +20,25 @@ overwatch = initialize_overwatch(__name__)
 
 TRAJECTORY_CONVERTER_REGISTRY = {}
 
+
 def register_trajectory_converter(name: str):
     def decorator(cls):
         TRAJECTORY_CONVERTER_REGISTRY[name] = cls
         return cls
+
     return decorator
+
 
 # 不同的数据集有不同的表征方式. libero是x,y,z,yaw,pitch,row + gripper夹取。
 # TODO: 未来可以实现更复杂的TrajectoryConverter，比如VQ-VAE编码+离散化 / 多个token代表一个浮点数等方式。 / 多个token代表一个空间中的点。
 class BaseTrajectoryConverter(ABC):
     """
-        其实是转换 单个浮点数(或者是轨迹上的点) 到 离散文本 的过程。
-        - 直接映射一个或者多个token表示一个浮点数
-        - VQ-VAE编码+离散化
-        - 不转换成离散文本也可以，用mlp+l1回归的方式。
+    其实是转换 单个浮点数(或者是轨迹上的点) 到 离散文本 的过程。
+    - 直接映射一个或者多个token表示一个浮点数
+    - VQ-VAE编码+离散化
+    - 不转换成离散文本也可以，用mlp+l1回归的方式。
     """
+
     def __init__(self):
         self.n_dims = 0
 
@@ -46,11 +50,14 @@ class BaseTrajectoryConverter(ABC):
     def decode_text_ids_to_trajectory(self, texts: str) -> np.ndarray:
         pass
 
+
 @register_trajectory_converter("value_textualize")
 class ValueTextualizeTC(BaseTrajectoryConverter):
     """将[-1,1]浮点数离散化为bin索引，映射到vocab_size-512~vocab_size-256的token（避免与EOS token 50256冲突）"""
-    
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, n_bins: int = 256, n_dims: int = 2):
+
+    def __init__(
+        self, tokenizer: PreTrainedTokenizerBase, n_bins: int = 256, n_dims: int = 2
+    ):
         self.tokenizer = tokenizer
         self.n_bins = n_bins
         self.n_dims = n_dims
@@ -59,66 +66,81 @@ class ValueTextualizeTC(BaseTrajectoryConverter):
         self.action_token_start = self.tokenizer.vocab_size - 512  # 动作token起始位置
 
     def encode_trajectory_to_token_ids(self, trajectory: np.ndarray) -> np.ndarray:
-        assert self.n_dims == trajectory.shape[1], f"维度不匹配：期望{self.n_dims}，得到{trajectory.shape[1]}"
+        assert (
+            self.n_dims == trajectory.shape[1]
+        ), f"维度不匹配：期望{self.n_dims}，得到{trajectory.shape[1]}"
         trajectory = np.clip(np.asarray(trajectory, dtype=np.float32), -1.0, 1.0)
         # digitize返回[1, n_bins]，-1转换为[0, n_bins-1]用于索引bin_centers
         bin_indices = np.digitize(trajectory, self.bins) - 1
         # 映射到token id: [vocab_size-512, vocab_size-256)
         token_ids = (self.action_token_start + bin_indices.flatten()).astype(int)
         return token_ids
-    
+
     def decode_text_ids_to_trajectory(self, text_ids: np.ndarray) -> np.ndarray:
         text_ids = text_ids[:-1]  # 移除EOS token
         # 反向映射：token_id -> bin索引，并clip到有效范围
-        bin_indices = np.clip(text_ids - self.action_token_start, 0, len(self.bin_centers) - 1)
+        bin_indices = np.clip(
+            text_ids - self.action_token_start, 0, len(self.bin_centers) - 1
+        )
         continuous = self.bin_centers[bin_indices]  # 用bin中心值作为连续估计
         return continuous.reshape(-1, self.n_dims)
 
-# 使用dataclass方便管理参数 
+
+# 使用dataclass方便管理参数
 @dataclass
 class VlaTokenizer:
     """
-        从dataset的batch中转换成prismatic的训练输入输出格式，如下： \n
-        batch["input_ids"]: 
-        batch["attention_mask"]:
-        batch["pixel_values"]:
-        batch["labels"]:
+    从dataset的batch中转换成prismatic的训练输入输出格式，如下： \n
+    batch["input_ids"]:
+    batch["attention_mask"]:
+    batch["pixel_values"]:
+    batch["labels"]:
     """
-    trajectory_converter: BaseTrajectoryConverter # 注意这个的trajectory tokenizer应该返回的是文本，而不是token ids（后续还需要编码）
-    base_tokenizer: PreTrainedTokenizerBase   # huggingface Transformers的tokenizer类。会将文本分词/编码到id/添加特殊token
-    prompt_builder_fn: Type[PromptBuilder]
-    predict_stop_token: bool = True
-    default_image_resolution: Tuple[int, int] = (224, 224)
 
-    def tokenize_batch(self, batch:  Dict[str, Any], train: bool = True) -> dict:
-        """Convert raw batch from dataset into model-ready inputs/labels."""
-        # TODO： 未来这里加入对数据集的gripper的滤波/裁剪等预处理操作
-        
+    trajectory_converter: BaseTrajectoryConverter  # 注意这个的trajectory tokenizer应该返回的是文本，而不是token ids（后续还需要编码）
+    base_tokenizer: PreTrainedTokenizerBase  # huggingface Transformers的tokenizer类。会将文本分词/编码到id/添加特殊token
+    prompt_builder_fn: Type[PromptBuilder]
+
+    def tokenize_input(self, batch: Dict[str, Any]) -> dict:
         # 定义vla的conversation prompt
         lang = batch["language"].lower().strip()
         prompt_builder = self.prompt_builder_fn("openvla")
-        
-        # Step1: 添加human turn，获取prompt（含"In: ...\nOut: "但不含action）
-        prompt_builder.add_turn("human", f"What action should the robot take to {lang}?")
-        prompt = prompt_builder.get_prompt() # 注意gpt2默认不添加eos tokens
-        prompt_ids = self.base_tokenizer(prompt)["input_ids"]
-        action_tokens = self.trajectory_converter.encode_trajectory_to_token_ids(batch['trajectory'])
 
-        input_ids = np.hstack([prompt_ids, action_tokens, [self.base_tokenizer.eos_token_id]])
-        
+        # Step1: 添加human turn，获取prompt（含"In: ...\nOut: "但不含action）
+        prompt_builder.add_turn(
+            "human", f"What action should the robot take to {lang}?"
+        )
+        prompt = prompt_builder.get_prompt()  # 注意gpt2默认不添加eos tokens
+        prompt_ids = self.base_tokenizer(prompt)["input_ids"]
+
+        return dict(
+            pixel_values={"cam1": batch["cam1"], "cam2": batch["cam2"]},
+            prompt_ids=prompt_ids,
+        )
+
+    def tokenize_batch(self, batch: Dict[str, Any], train: bool = True) -> dict:
+        """Convert raw batch from dataset into model-ready inputs/labels."""
+        # TODO： 未来这里加入对数据集的gripper的滤波/裁剪等预处理操作
+        inputs = self.tokenize_input(batch)
+        action_tokens = self.trajectory_converter.encode_trajectory_to_token_ids(
+            batch["trajectory"]
+        )
+        input_ids = np.hstack(
+            [inputs["prompt_ids"], action_tokens, [self.base_tokenizer.eos_token_id]]
+        )
+
         # Step6: 只保留action部分的labels，其余设为IGNORE_INDEX
         labels = input_ids.copy()
-        prompt_ids_length = len(prompt_ids)
+        prompt_ids_length = len(inputs["prompt_ids"])
         labels[:prompt_ids_length] = IGNORE_INDEX
-        if not self.predict_stop_token: labels[-1] = IGNORE_INDEX
-    
+
         # overwatch.info(f"input_ids: {prompt_ids}")
         # overwatch.info(f"full input_ids: {input_ids}")
         # overwatch.info(f"labels: {labels}")
         return dict(
-            pixel_values={"cam1": batch["cam1"], "cam2": batch["cam2"]}, 
-            input_ids=torch.tensor(input_ids), 
-            labels=torch.tensor(labels), 
+            pixel_values=inputs["pixel_values"],
+            input_ids=torch.tensor(input_ids),
+            labels=torch.tensor(labels),
             dataset_names=batch["dataset_names"],
             prompt_ids_length=torch.tensor(prompt_ids_length),
         )

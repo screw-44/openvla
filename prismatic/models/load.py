@@ -167,10 +167,20 @@ def load(
     overwatch.info(f"Loading from {path_type}: {resolved_path}")
 
     # For HF cached models, resolved_path is already the snapshot directory
-    model_dir = Path(resolved_path)
-    checkpoint_safetensors = model_dir / "checkpoints" / "latest-checkpoint.safetensors"
-    if not checkpoint_safetensors.exists():
-        checkpoint_safetensors = None
+    if path_type == PATH_TYPE_HF_CACHED:
+        model_dir = Path(resolved_path)
+        checkpoint_safetensors = (
+            model_dir / "checkpoints" / "latest-checkpoint.safetensors"
+        )
+        if not checkpoint_safetensors.exists():
+            checkpoint_safetensors = None
+    else:
+        checkpoint_safetensors = checkpoint_path
+        model_dir = (
+            checkpoint_path.parent
+            if "checkpoints" not in str(checkpoint_path)
+            else checkpoint_path.parent.parent
+        )
 
     # Load model configuration
     model_cfg = _load_model_config(model_dir, vla_cfg)
