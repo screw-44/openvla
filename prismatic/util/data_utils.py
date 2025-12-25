@@ -126,7 +126,7 @@ class PaddedCollatorForLanguageModeling:
 class PaddedCollatorForActionPrediction:
     model_max_length: int
     pad_token_id: int
-    padding_side: str = "left"  # 改为 left padding (默认)
+    padding_side: str = "right"  # 改为 left padding (默认)
     pixel_values_dtype: torch.dtype = torch.float32
 
     def __call__(

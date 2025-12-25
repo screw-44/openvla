@@ -48,7 +48,7 @@ def main():
         "--model_path",
         type=Path,
         default="/inspire/hdd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla_runs/" \
-        "base+b32+x7--1_train2eval/checkpoints/step-003300-epoch-00-loss=0.0000.safetensors",
+        "base+b64+x7--1-distilgpt2-aff-bining/checkpoints/latest-checkpoint.safetensors",
         help="包含 config.json 的模型目录（如训练的 run 目录）",
     )
     parser.add_argument("--env_task", default="libero_10", help="环境任务")
@@ -73,7 +73,7 @@ def main():
         f"--eval.n_episodes={args.n_episodes}",
         f"--eval.batch_size={args.batch_size}",
         "--policy.device=cuda",
-        f"--env.control_mode=absolute",  # 设置为 False 即使用绝对位置
+        f"--env.control_mode=relative",  # 设置为 False 即使用绝对位置
         f"--output_dir={args.output_dir}",
     ]
 

@@ -157,7 +157,7 @@ class HFCausalLLMBackbone(LLMBackbone, ABC):
                 hf_hub_path, 
                 model_max_length=self.llm_max_length, 
                 local_files_only=True,  # Force offline mode
-                padding_side="left" # 采用left的方式
+                padding_side="right" # 采用right的方式
             )
         except (OSError, FileNotFoundError) as e:
             raise ValueError(

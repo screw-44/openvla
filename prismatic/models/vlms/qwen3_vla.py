@@ -142,7 +142,7 @@ class Qwen3VLA(VLM):
             )
 
         # 配置 tokenizer padding（改为 left padding）
-        self.processor.tokenizer.padding_side = "left"
+        self.processor.tokenizer.padding_side = "right"
         if self.processor.tokenizer.pad_token is None:
             self.processor.tokenizer.pad_token = self.processor.tokenizer.eos_token
             self.model.config.pad_token_id = self.processor.tokenizer.eos_token_id

@@ -66,6 +66,7 @@ class ValueTextualizeTC(BaseTrajectoryConverter):
         self.action_token_start = self.tokenizer.vocab_size - 512  # 动作token起始位置
 
     def encode_trajectory_to_token_ids(self, trajectory: np.ndarray) -> np.ndarray:
+        # print("trajectory:", trajectory)
         assert (
             self.n_dims == trajectory.shape[1]
         ), f"维度不匹配：期望{self.n_dims}，得到{trajectory.shape[1]}"

@@ -153,33 +153,32 @@ class VLAPolicy(PreTrainedPolicy):
         # print("2： shape of cam1: ", pixel_values["cam1"].shape)
         # print("processed cam1", pixel_values["cam1"])
         # print("processed cam2", pixel_values["cam2"])
-        print(
-            "mean:",
-            pixel_values["cam1"].mean().item(),
-            "std:",
-            pixel_values["cam1"].std().item(),
-        )
+        # print(
+        #     "mean:",
+        #     pixel_values["cam1"].mean().item(),
+        #     "std:",
+        #     pixel_values["cam1"].std().item(),
+        # )
         # print("batch:", batch)
         input_ids = (
             torch.tensor(batch["prompt_ids"], dtype=torch.long)
             .unsqueeze(0)
             .to(self.model.device)
         )
-
+        attention_mask = input_ids.ne(
+            self.model.llm_backbone.tokenizer.pad_token_id
+        )
         # 在生成前添加调试
-        with torch.autocast("cuda", dtype=self.model.llm_backbone.half_precision_dtype):
-            attention_mask = input_ids.ne(
-                self.model.llm_backbone.tokenizer.pad_token_id
-            )
-            # print("attn mask", attention_mask)
-            outputs = self.model(
-                input_ids=input_ids,
-                pixel_values=pixel_values,
-                use_cache=False,
-            )
-            print(f"logits shape: {outputs.logits.shape}")
-            print(f"last token logits (first 10): {outputs.logits[0, -1, :10]}")
-            print(f"output tokens:", outputs.logits.argmax(dim=2)[0][-10:])
+        # with torch.autocast("cuda", dtype=self.model.llm_backbone.half_precision_dtype):
+        #     # print("attn mask", attention_mask)
+        #     outputs = self.model(
+        #         input_ids=input_ids,
+        #         pixel_values=pixel_values,
+        #         use_cache=False,
+        #     )
+        #     print(f"logits shape: {outputs.logits.shape}")
+        #     print(f"last token logits (first 10): {outputs.logits[0, -1, :10]}")
+        #     print(f"output tokens:", outputs.logits.argmax(dim=2)[0][-10:])
 
         # 输入prompt是一样的：In:What action should the robot take to put both the alphabet soup and the tomato sauce in the basket?
         #     Out:
@@ -199,14 +198,15 @@ class VLAPolicy(PreTrainedPolicy):
         # 清空缓存，确保每个样本独立处理
         self.model.cache = None
 
-        print(f"Generated tokens:     {generated_ids[0]}")
-        print("测试方式预测的ids：", generated_ids[0][-10:])
+        # print(f"Generated tokens:     {generated_ids[0]}")
+        # print("测试方式预测的ids：", generated_ids[0][-10:])
         generated_ids = generated_ids[0, input_ids.shape[1] :].cpu()
 
-        # print(generated_ids)
+        print(generated_ids)
+        exit()
         # print("input_ids.shape", input_ids.shape)
 
-        if True:
+        if False:
             from prismatic.training.metrics import VLAMetrics
 
             metrics = VLAMetrics("1", {"1": 1}, "1")
@@ -226,7 +226,7 @@ class VLAPolicy(PreTrainedPolicy):
             input_ids = batch["input_ids"].unsqueeze(0).to("cuda")
 
             # input_ids[0][-7:] = self.model.llm_backbone.tokenizer.pad_token_id
-            # input_ids[0][-8] = 11
+            input_ids[0][-8] = 11
             print("input_ids:", input_ids, "shape:", input_ids.shape)
 
             attention_mask = input_ids.ne(
@@ -254,19 +254,19 @@ class VLAPolicy(PreTrainedPolicy):
             batch["labels"] = batch["labels"].unsqueeze(0)
             metrics.log_pro(output, batch, self.model, 0.0)
 
-        if len(generated_ids) != 8:
-            return torch.Tensor([0, 0, 0, 0, 0, 0, 0, -1])
+        # if len(generated_ids) != 8:
+        #     return torch.Tensor([0, 0, 0, 0, 0, 0, 0, -1])
 
         cont_pred = self.model.trajectory_converter.decode_text_ids_to_trajectory(
             generated_ids
         )
-        cont_gt = self.model.trajectory_converter.decode_text_ids_to_trajectory(
-            batch["labels"][:-8]
-        )
+        # cont_gt = self.model.trajectory_converter.decode_text_ids_to_trajectory(
+        #     batch["labels"][:-8]
+        # )
 
-        print("")
-        print("predicted  cont_pred:", cont_pred)
-        print("gt cont_pred:", cont_gt)
+        # print("")
+        # print("predicted  cont_pred:", cont_pred)
+        # print("gt cont_pred:", cont_gt)
 
         # exit()
         return torch.Tensor(cont_pred)
@@ -364,7 +364,7 @@ if __name__ == "__main__":
 
     policy = VLAPolicy.from_pretrained(
         pretrained_name_or_path="/inspire/hdd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla_runs/"
-        + "base+b32+x7--1_train2eval/"
+        + "base+b64+x7--2_train2eval_without_flashattn/"
     )
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 

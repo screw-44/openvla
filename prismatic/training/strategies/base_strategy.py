@@ -184,13 +184,12 @@ class RunStrategy(ABC):
             )
             for batch in step_progress:
                 metrics.global_step += 1
-                # batch["input_ids"][0][-8] = 100
                 # overwatch.info(
                 #     f"training batch: input_ids[0]={batch['input_ids'][0]}, shape={batch['input_ids'][0].shape}, "
                 #     f"attention_mask[0]={batch['attention_mask'][0]}, shape {batch['attention_mask'][0].shape}"
                 #     f"labels[0]={batch['labels'][0]},  shape {batch['labels'][0].shape}"
-                #     # f"cam1={batch['pixel_values']['cam1'][0]} "
-                #     # f"cam2[0]={batch['pixel_values']['cam2'][0]}"
+                # #     # f"cam1={batch['pixel_values']['cam1'][0]} "
+                # #     # f"cam2[0]={batch['pixel_values']['cam2'][0]}"
                 # )
                 with torch.autocast(
                     "cuda",
