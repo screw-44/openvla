@@ -75,6 +75,7 @@ class MyLeRobotDataset(torch.utils.data.Dataset):
 
         delta_timestamps = {"affordance":[]} if self.is_affordance else None
         self.train_dataset = LeRobotDataset(
+            #"HuggingFaceVLA_cus/libero_cut_zcd_20_15_lastseg_indicator",
             repo_id,
             root=self.root,
             episodes=None, # self.train_episode,

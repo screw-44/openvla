@@ -27,6 +27,7 @@ overwatch = initialize_overwatch(__name__)
 # Model ID to complete snapshot path mapping
 MODEL_ID_TO_HF_PATH = {
     "distilgpt2": "models--distilgpt2/snapshots/2290a62682d06624634c1f46a6ad5be0f47f38aa",
+    "qwen2.5-0.5b": "models--Qwen--Qwen2.5-0.5B-Instruct/snapshots/7ae557604adf67be50417f59c2c2f167def9a775",  # Qwen2.5-0.5B (will be auto-downloaded if not cached)
     "qwen3-vl-2b": "models--Qwen--Qwen3-VL-2B-Instruct/snapshots/89644892e4d85e24eaac8bacfd4f463576704203",
     "qwen3-vl-4b": "models--Qwen--Qwen3-VL-4B-Instruct/snapshots/ebb281ec70b05090aa6165b016eac8ec08e71b17",
     "qwen3-vl-7b": "models--Qwen--Qwen2.5-VL-7B-Instruct/snapshots/placeholder",  # TODO: Add real path when available

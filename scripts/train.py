@@ -72,6 +72,22 @@ class RunConfig:
 def train(cfg: RunConfig) -> None:
     overwatch.info("OpenVLA Training :: Warming Up")
 
+    # === CRITICAL FIX: Re-instantiate VLA config based on vla_id parameter ===
+    # The issue: RunConfig.vla field is initialized with a hardcoded factory that uses VLARegistry.VLA.vla_id
+    # (always "base"), so even when CLI passes --vla.vla_id "qwen2.5-0.5b", the config object is still
+    # an instance of base VLAConfig with only its vla_id field modified, not a Qwen25_05B_Config instance.
+    # This means all subclass-specific fields (like base_vlm, learning_rate, per_device_batch_size) are wrong.
+    #
+    # Solution: Re-instantiate cfg.vla to get the correct config class with all correct field values.
+    if cfg.vla.vla_id and cfg.vla.vla_id != "base":
+        overwatch.info(f"Re-instantiating VLA config for type: {cfg.vla.vla_id}")
+        cfg.vla = VLAConfig.get_choice_class(cfg.vla.vla_id)()
+        overwatch.info(
+            f"✅ Loaded correct VLA config: vla_id={cfg.vla.vla_id}, "
+            f"base_vlm={cfg.vla.base_vlm}, lr={cfg.vla.learning_rate}, "
+            f"bs={cfg.vla.per_device_batch_size}"
+        )
+
     # Configure Unique Run Name & Save Directory
     vla_id = cfg.vla.vla_id
     cfg.run_id = (
@@ -81,6 +97,8 @@ def train(cfg: RunConfig) -> None:
     )
     if cfg.run_id_note is not None:
         cfg.run_id += f"--{cfg.run_id_note}"
+
+    print("vla:", cfg.vla)
 
     # Start =>> Build Directories and Set Randomness
     worker_init_fn = set_global_seed(cfg.seed, get_worker_init_fn=True)

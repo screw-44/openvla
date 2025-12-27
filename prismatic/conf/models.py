@@ -80,7 +80,7 @@ class LLaVa_v15_Reproduction_7B(ModelConfig):
     llm_backbone_id: str = "vicuna-v15-7b"
 
     image_resize_strategy: str = "letterbox"
-    llm_max_length: int = 2048
+    llm_max_length: int = 4096
 
     # Align Stage Optimization Parameters
     align_epochs: int = 1
@@ -151,6 +151,13 @@ class DistilGPT2(Exp_7B_One_Stage):
     llm_backbone_id: str = "distilgpt2"
 
 
+@dataclass
+class Qwen25(Exp_7B_One_Stage):
+    model_id: str = "qwen2.5-0.5b"
+    arch_specifier: str = "no-align+gelu-mlp"
+    vision_backbone_id: str = "siglip-vit-b16-224px" 
+    llm_backbone_id: str = "qwen2.5-0.5b-instruct" 
+
 # === Define a Model Registry Enum for Reference & Validation ===
 @unique
 class ModelRegistry(Enum):
@@ -163,6 +170,8 @@ class ModelRegistry(Enum):
     
     # Debug Model
     DISTILGPT2 = DistilGPT2
+
+    QWEN25 = Qwen25
 
     @property
     def model_id(self) -> str:

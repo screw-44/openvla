@@ -16,6 +16,7 @@ from prismatic.models.backbones.llm import (
     PhiLLMBackbone,
 )
 from prismatic.models.backbones.llm.distilgpt2 import DistilGPT2Backbone
+from prismatic.models.backbones.llm.qwen25 import Qwen25Backbone
 from prismatic.models.backbones.vision import (
     CLIPViTBackbone,
     DinoCLIPViTBackbone,
@@ -79,6 +80,8 @@ LLM_BACKBONES = {
 
     # === Lightweight Debugging Backbone (Few Hundred MB) ===
     "distilgpt2": {"cls": DistilGPT2Backbone, "kwargs": {}},
+
+    "qwen2.5-0.5b-instruct": {"cls": Qwen25Backbone, "kwargs": {}}
 }
 
 # fmt: on

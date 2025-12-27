@@ -41,6 +41,7 @@ def setup_eval_model_link(model_path: Path):
 
 
 def main():
+    dir = "qwen2.5-0.5b+b64+x7--1-qwen25-stock-(训练30个epoch)"
     parser = argparse.ArgumentParser(
         description="简化的 VLA 评估脚本：直接读取 config.json，用软连接链接权重"
     )
@@ -48,14 +49,14 @@ def main():
         "--model_path",
         type=Path,
         default="/inspire/hdd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla_runs/" \
-        "base+b64+x7--1-distilgpt2-aff-bining/checkpoints/latest-checkpoint.safetensors",
+        f"{dir}/checkpoints/latest-checkpoint.safetensors",
         help="包含 config.json 的模型目录（如训练的 run 目录）",
     )
     parser.add_argument("--env_task", default="libero_10", help="环境任务")
     parser.add_argument("--n_episodes", type=int, default=1, help="评估轮数")
     parser.add_argument("--batch_size", type=int, default=1, help="批大小")
     parser.add_argument(
-        "--output_dir", default="./eval_results", help="评估结果输出目录"
+        "--output_dir", default=f"./eval_results/{dir}", help="评估结果输出目录"
     )
 
     args = parser.parse_args()

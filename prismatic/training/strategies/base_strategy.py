@@ -207,7 +207,6 @@ class RunStrategy(ABC):
                 # overwatch.info(f"output logits:{output.logits.argmax(dim=2)[0][-10:]}")
                 # print("input prompt:", self.model.llm_backbone.tokenizer.decode(input_ids.squeeze(0).tolist()))
                 # generated_ids = generated_ids[0, input_ids.shape[1] :].cpu()
-
                 # === 计算动作预测准确率和L1损失 ===
                 # 使用metrics.log_pro()计算所有指标（处理变长序列和per-sample L1损失）
                 if overwatch.is_rank_zero():

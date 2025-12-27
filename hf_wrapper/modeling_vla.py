@@ -54,6 +54,7 @@ class VLAPolicy(PreTrainedPolicy):
         self.trajectory_compression: BaseTrajectoryCompression = None
 
         self.dataset_name = "HuggingFaceVLA/libero"
+        self.last_output = None
 
     @classmethod
     def from_pretrained(
@@ -98,14 +99,6 @@ class VLAPolicy(PreTrainedPolicy):
         )
         policy.model.to("cuda").eval()  # 默认load cuda
 
-        # Disable Flash Attention to avoid StopIteration error in forward()
-        # This is a workaround for transformers library issue
-        # if hasattr(policy.model, "llm_backbone") and hasattr(
-        #     policy.model.llm_backbone, "llm"
-        # ):
-        #     # Set attention implementation to eager (no Flash Attention)
-        #     policy.model.llm_backbone.llm._attn_implementation = "eager"
-
         logger.info(f"Loading from the function: load is complete")
 
         (
@@ -134,32 +127,20 @@ class VLAPolicy(PreTrainedPolicy):
                 language=item[DATASET_ITEM_MAP_KEYS[self.dataset_name]["language"]][0],
             )
         )
-
-        # 首先需要把数据进行处理，变成key和dataset中对齐，
-        # print("batch after tokenize_input:", batch)
-
+        
         # 统一数据类型到模型的 dtype
         pixel_values, image_transform = (
             batch["pixel_values"],
             self.model.vision_backbone.image_transform,
         )
-        # print("1: shape of cam1: ", pixel_values["cam1"].shape)
+
         pixel_values["cam1"] = (
             image_transform(pixel_values["cam1"]).unsqueeze(0).to(self.model.device)
         )
         pixel_values["cam2"] = (
             image_transform(pixel_values["cam2"]).unsqueeze(0).to(self.model.device)
         )
-        # print("2： shape of cam1: ", pixel_values["cam1"].shape)
-        # print("processed cam1", pixel_values["cam1"])
-        # print("processed cam2", pixel_values["cam2"])
-        # print(
-        #     "mean:",
-        #     pixel_values["cam1"].mean().item(),
-        #     "std:",
-        #     pixel_values["cam1"].std().item(),
-        # )
-        # print("batch:", batch)
+
         input_ids = (
             torch.tensor(batch["prompt_ids"], dtype=torch.long)
             .unsqueeze(0)
@@ -168,22 +149,6 @@ class VLAPolicy(PreTrainedPolicy):
         attention_mask = input_ids.ne(
             self.model.llm_backbone.tokenizer.pad_token_id
         )
-        # 在生成前添加调试
-        # with torch.autocast("cuda", dtype=self.model.llm_backbone.half_precision_dtype):
-        #     # print("attn mask", attention_mask)
-        #     outputs = self.model(
-        #         input_ids=input_ids,
-        #         pixel_values=pixel_values,
-        #         use_cache=False,
-        #     )
-        #     print(f"logits shape: {outputs.logits.shape}")
-        #     print(f"last token logits (first 10): {outputs.logits[0, -1, :10]}")
-        #     print(f"output tokens:", outputs.logits.argmax(dim=2)[0][-10:])
-
-        # 输入prompt是一样的：In:What action should the robot take to put both the alphabet soup and the tomato sauce in the basket?
-        #     Out:
-        # print("input prompt:", self.model.llm_backbone.tokenizer.decode(input_ids.squeeze(0).tolist()))
-        # print("half precision type: ", self.model.llm_backbone.half_precision_dtype)
 
         with torch.autocast("cuda", dtype=self.model.llm_backbone.half_precision_dtype):
             generated_ids = GenerationMixin.generate(
@@ -195,81 +160,17 @@ class VLAPolicy(PreTrainedPolicy):
                 do_sample=False,  # 强制贪心解码
                 # max_new_tokens=8,  # 手动添加，这是不应该的
             )
-        # 清空缓存，确保每个样本独立处理
-        self.model.cache = None
-
-        # print(f"Generated tokens:     {generated_ids[0]}")
-        # print("测试方式预测的ids：", generated_ids[0][-10:])
         generated_ids = generated_ids[0, input_ids.shape[1] :].cpu()
 
-        print(generated_ids)
-        exit()
-        # print("input_ids.shape", input_ids.shape)
 
-        if False:
-            from prismatic.training.metrics import VLAMetrics
+        if len(generated_ids) != 8:
+            return self.last_output
 
-            metrics = VLAMetrics("1", {"1": 1}, "1")
-
-            uni_key_item = dict(
-                cam1=item[DATASET_ITEM_MAP_KEYS[self.dataset_name]["cam1"]],
-                cam2=item[DATASET_ITEM_MAP_KEYS[self.dataset_name]["cam2"]],
-                language=item[DATASET_ITEM_MAP_KEYS[self.dataset_name]["language"]][0],
-                trajectory=item["action"],
-                dataset_names=self.dataset_name,
-            )
-            batch = self.vla_tokenizer.tokenize_batch(uni_key_item, train=True)
-            print(
-                "test batch labels: ", batch["labels"], "shape:", batch["labels"].shape
-            )
-
-            input_ids = batch["input_ids"].unsqueeze(0).to("cuda")
-
-            # input_ids[0][-7:] = self.model.llm_backbone.tokenizer.pad_token_id
-            input_ids[0][-8] = 11
-            print("input_ids:", input_ids, "shape:", input_ids.shape)
-
-            attention_mask = input_ids.ne(
-                self.model.llm_backbone.tokenizer.pad_token_id
-            )
-            print("attn mask", attention_mask, "shape:", attention_mask.shape)
-
-
-            # exit()
-            # print("item:", item)
-            with torch.autocast(
-                "cuda",
-                dtype=torch.bfloat16,
-                enabled=self.model.enable_mixed_precision_training,
-            ):
-                output = self.model(
-                    input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    pixel_values=pixel_values,
-                    labels=batch["labels"].unsqueeze(0).to("cuda"),
-                )
-
-            print(f"output tokens:", outputs.logits.argmax(dim=2)[0][-10:])
-            batch["prompt_ids_length"] = batch["prompt_ids_length"].unsqueeze(0)
-            batch["labels"] = batch["labels"].unsqueeze(0)
-            metrics.log_pro(output, batch, self.model, 0.0)
-
-        # if len(generated_ids) != 8:
-        #     return torch.Tensor([0, 0, 0, 0, 0, 0, 0, -1])
-
-        cont_pred = self.model.trajectory_converter.decode_text_ids_to_trajectory(
+        self.last_output = torch.Tensor(self.model.trajectory_converter.decode_text_ids_to_trajectory(
             generated_ids
-        )
-        # cont_gt = self.model.trajectory_converter.decode_text_ids_to_trajectory(
-        #     batch["labels"][:-8]
-        # )
-
-        # print("")
-        # print("predicted  cont_pred:", cont_pred)
-        # print("gt cont_pred:", cont_gt)
-
-        # exit()
-        return torch.Tensor(cont_pred)
+        ))
+        
+        return self.last_output
 
     def predict_action_chunk(
         self,

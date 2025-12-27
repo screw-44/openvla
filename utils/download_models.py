@@ -5,13 +5,14 @@ download_models.py
 下载 VLA 训练所需的新模型权重到 HuggingFace 缓存中
 
 支持的模型:
-- Qwen3-VL (Qwen2-VL) 2B/7B/72B
-- DistilGPT2
+- Qwen2.5-0.5B-Instruct (推荐用于 VLA LLM Backbone)
+- Qwen2-VL 2B/7B (用于对比实验)
+- DistilGPT2 (旧调试模型)
 
 使用方法:
-    python download_models.py --all                    # 下载所有模型
-    python download_models.py --model qwen3-vl-2b      # 下载特定模型
-    python download_models.py --model distilgpt2      # 下载 DistilGPT2
+    python download_models.py                          # 默认下载 Qwen2.5-0.5B
+    python download_models.py --model qwen2.5-0.5b     # 显式指定下载
+    python download_models.py --all                    # 下载所有
 """
 
 import argparse
@@ -23,25 +24,29 @@ from huggingface_hub import snapshot_download
 
 # 模型映射表
 MODEL_REGISTRY = {
-    "qwen3-vl-2b": {
-        "hf_path": "Qwen/Qwen3-VL-2B-Instruct",
-        "size": "~4.5GB",
-        "description": "Qwen3-VL 2B Instruct (统一多模态模型)",
+    # ✅ [核心] 你的新主力 LLM Backbone
+    "qwen2.5-0.5b": {
+        "hf_path": "Qwen/Qwen2.5-0.5B-Instruct",
+        "size": "~1.2GB",
+        "description": "Qwen2.5 0.5B Instruct (VLA 训练最佳小模型 backbone)",
     },
-    "qwen3-vl-4b": {
-        "hf_path": "Qwen/Qwen3-VL-4B-Instruct",
-        "size": "~10GB",
-        "description": "Qwen3-VL 4B Instruct (统一多模态模型)",
+    # VLA 视觉塔 (Vision Backbone) - Prismatic 默认使用 SigLIP
+    "siglip-so400m": {
+        "hf_path": "google/siglip-so400m-patch14-384",
+        "size": "~1.8GB",
+        "description": "SigLIP So400M (VLA 推荐 Vision Backbone)",
     },
-    "qwen3-vl-7b": {
-        "hf_path": "Qwen/Qwen3-VL-7B-Instruct",
-        "size": "~15GB",
-        "description": "Qwen3-VL 7B Instruct (统一多模态模型)",
-    },
+    # 旧调试模型
     "distilgpt2": {
         "hf_path": "distilgpt2",
         "size": "~320MB",
-        "description": "DistilGPT2 (轻量级语言模型，用于调试)",
+        "description": "DistilGPT2 (旧调试模型)",
+    },
+    # 其它全量 VLM (如果你想跑对比实验)
+    "qwen2-vl-2b": {
+        "hf_path": "Qwen/Qwen2-VL-2B-Instruct",
+        "size": "~4.5GB",
+        "description": "Qwen2-VL 2B Instruct (基准对比模型)",
     },
 }
 
@@ -49,12 +54,6 @@ MODEL_REGISTRY = {
 def download_model(model_name: str, force: bool = False) -> None:
     """
     下载指定模型到 HuggingFace 缓存
-    
-    使用 snapshot_download 避免立即加载模型导致的兼容性问题
-    
-    Args:
-        model_name: 模型名称 (e.g., 'qwen3-vl-2b', 'distilgpt2')
-        force: 是否强制重新下载（即使已缓存）
     """
     if model_name not in MODEL_REGISTRY:
         raise ValueError(
@@ -75,15 +74,15 @@ def download_model(model_name: str, force: bool = False) -> None:
     print(f"{'='*60}\n")
     
     try:
-        # 使用 snapshot_download 下载整个模型仓库
-        # 这样避免了立即加载模型可能导致的版本不兼容问题
         print(f"正在下载 {hf_path}...")
         print(f"提示: 使用 snapshot_download 下载完整模型文件")
         
+        # 核心下载逻辑
         cache_dir = snapshot_download(
             repo_id=hf_path,
             repo_type="model",
-            ignore_patterns=["*.msgpack", "*.h5", "*.ot"],  # 跳过不需要的格式
+            # 排除不必要的超大文件，只下载 safetensors
+            ignore_patterns=["*.msgpack", "*.h5", "*.ot", "*.bin"], 
             local_files_only=False,
             force_download=force,
         )
@@ -93,6 +92,7 @@ def download_model(model_name: str, force: bool = False) -> None:
         
     except Exception as e:
         print(f"\n❌ 下载 {model_name} 时出错: {e}\n")
+        print(f"建议: 请检查网络连接，或者是否配置了 HF_ENDPOINT 镜像\n")
         raise
 
 
@@ -109,12 +109,7 @@ def main():
     parser.add_argument(
         "--all",
         action="store_true",
-        help="下载所有模型（警告：总大小 ~165GB）",
-    )
-    parser.add_argument(
-        "--skip-72b",
-        action="store_true",
-        help="跳过 72B 模型（与 --all 一起使用）",
+        help="下载所有注册的模型",
     )
     parser.add_argument(
         "--force",
@@ -127,28 +122,24 @@ def main():
     # 确定要下载的模型列表
     if args.all:
         models_to_download = list(MODEL_REGISTRY.keys())
-        if args.skip_72b:
-            models_to_download = [m for m in models_to_download if m != "qwen3-vl-72b"]
-            print("⚠️  跳过 Qwen3-VL 72B 模型")
     elif args.model:
         models_to_download = [args.model]
     else:
-        # 默认下载小模型用于调试
-        print("未指定模型，默认下载轻量级模型：")
-        models_to_download = ["qwen3-vl-4b"]
+        # ✅ 默认修改为下载 Qwen2.5-0.5B
+        print("未指定模型，默认下载 VLA 所需的核心组件：")
+        models_to_download = ["qwen2.5-0.5b", "siglip-so400m"]
     
     # 显示下载计划
     print("\n" + "="*60)
     print("📋 下载计划:")
-    total_size = 0
     for model_name in models_to_download:
         info = MODEL_REGISTRY[model_name]
         print(f"  - {model_name:20s} ({info['size']})")
     print("="*60)
     
     # 确认下载
-    if args.all and not args.skip_72b:
-        response = input("\n⚠️  将下载所有模型（~165GB），确认继续？[y/N]: ")
+    if args.all:
+        response = input("\n⚠️  将下载所有模型，确认继续？[y/N]: ")
         if response.lower() != 'y':
             print("已取消下载")
             return
@@ -176,15 +167,14 @@ def main():
     print(f"  ✅ 成功: {success_count}/{len(models_to_download)}")
     if failed_models:
         print(f"  ❌ 失败: {', '.join(failed_models)}")
-    print("="*60)
     
     # 显示 HF 缓存位置
     hf_cache = os.environ.get(
         "HF_HOME",
         os.path.expanduser("~/.cache/huggingface")
     )
-    print(f"\n💾 模型已缓存到: {hf_cache}")
-    print("\n✨ 现在可以运行训练了！")
+    print(f"💾 模型缓存路径: {hf_cache}")
+    print("="*60)
 
 
 if __name__ == "__main__":

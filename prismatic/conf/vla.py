@@ -48,7 +48,7 @@ class VLAConfig(PreTrainedConfig):
     reduce_in_full_precision: bool = True           # Accumulate/Reduce All-Gather Gradients in FP32 Full Precision
 
     # Trajectory Configuration
-    trajectory_compression: str = "bining"          # Trajectory compression method (e.g., 'bining', 'action_chunk', 'uniform_bspline')
+    trajectory_compression: str = "action_chunk"          # Trajectory compression method (e.g., 'bining', 'action_chunk', 'uniform_bspline')
     trajectory_converter_type: str = 'value_textualize'  # Converter type for action discretization
     trajectory_n_bins: int = 256                    # Number of bins for discretization
     trajectory_n_dims: int = 7                      # Action dimensions (e.g., 7DOF for Libero)
@@ -154,6 +154,38 @@ class Qwen3VL_4BConfig(Qwen3VL_2BConfig):
     per_device_batch_size: int = 16
 
 
+# === Qwen2.5-0.5B Instruct Config (强烈推荐替换 DistilGPT2) ===
+@dataclass
+class Qwen25_05B_Config(VLAConfig):
+    vla_id: str = "qwen2.5-0.5b"
+    base_vlm: str = "qwen2.5-0.5b"
+    # 这里对应你在 backbone 字典里注册的 key (在 qwen25.py 中定义的)
+    # llm_backbone: str = "qwen2.5-0.5b-instruct" 
+    # 这里通常不需要变，Prismatic 默认使用 SigLIP，效果最好
+    # vision_backbone: str = "siglip-vit-so400m-14-384"
+    
+    # 训练策略：全量微调 LLM，冻结视觉塔 (比较稳的起手式)
+    freeze_vision_backbone: bool = True   
+    freeze_llm_backbone: bool = False     
+    unfreeze_last_llm_layer: bool = False 
+
+    # === 关键优化参数 ===
+    # 1. 学习率：Qwen 比 DistilGPT2 敏感，5e-4 会爆，推荐 2e-5 ~ 5e-5
+    learning_rate: float = 5e-5           
+    # 2. Warmup：给多一点预热时间
+    warmup_ratio: float = 0.05            
+    
+    # === 显存利用 (针对你的 4090) ===
+    # 0.5B 模型非常小，BF16下权重仅 1GB。
+    # 你可以把单卡 Batch 拉得很大，极大加快训练吞吐。
+    per_device_batch_size: int = 16 # 0.5b 16(4090上) #  是64    
+
+    trajectory_n_bins: int = 256
+    
+    # 3. 强制指定 Global Batch Size，确保梯度累积生效
+    # 64(单卡) * 2(卡数) * 2(累积) = 256
+    # global_batch_size: int = 256
+
 # === Define a VLA Registry Enum for Reference & Validation ===
 @unique
 class VLARegistry(Enum):
@@ -168,6 +200,9 @@ class VLARegistry(Enum):
     QWEN3_VL_2B = Qwen3VL_2BConfig
     QWEN3_VL_7B = Qwen3VL_7BConfig
     QWEN3_VL_4B = Qwen3VL_4BConfig
+
+    # ✅ 新增：Qwen2.5-0.5B
+    QWEN25_05B = Qwen25_05B_Config
 
     @property
     def vla_id(self) -> str:
