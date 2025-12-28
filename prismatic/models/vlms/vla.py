@@ -12,7 +12,6 @@ import torch
 from PIL import Image
 from transformers import LlamaTokenizerFast, GenerationMixin
 
-from prismatic.conf.datasets import DatasetConfig
 from prismatic.models.vlms.prismatic import PrismaticVLM
 from prismatic.overwatch import initialize_overwatch
 from prismatic.vla.tokenizer import BaseTrajectoryConverter

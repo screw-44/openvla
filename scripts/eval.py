@@ -52,9 +52,9 @@ def main():
         f"{dir}/checkpoints/latest-checkpoint.safetensors",
         help="包含 config.json 的模型目录（如训练的 run 目录）",
     )
-    parser.add_argument("--env_task", default="libero_10", help="环境任务")
-    parser.add_argument("--n_episodes", type=int, default=1, help="评估轮数")
-    parser.add_argument("--batch_size", type=int, default=1, help="批大小")
+    parser.add_argument("--env_task", default="libero_10,libero_object,libero_spatial,libero_goal", help="环境任务")
+    parser.add_argument("--n_episodes", type=int, default=20, help="评估轮数")
+    parser.add_argument("--batch_size", type=int, default=20, help="批大小")
     parser.add_argument(
         "--output_dir", default=f"./eval_results/{dir}", help="评估结果输出目录"
     )

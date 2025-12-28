@@ -70,21 +70,21 @@ echo ""
 
 # 启动训练 - 构建命令
 TRAIN_CMD="torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} scripts/train.py \
-  --mode.type train_validate \
-  --mode.is_resume false \
-  --mode.validate_interval ${VALIDATE_INTERVAL} \
-  --mode.num_validation_batches ${NUM_VALIDATION_BATCHES} \
-  --vla.vla_id \"${VLA_TYPE}\" \
-  --dataset.type \"${DATASET_TYPE}\" \
-  --vla.trajectory_compression \"${TRAJECTORY_COMPRESSION}\" \
-  --run_root_dir \"${RUN_ROOT_DIR}\" \
-  --run_id_note \"${CURRENT_RUN_ID}\" \
-  --save_interval \"${SAVE_INTERVAL}\" \
-  --epochs ${EPOCHS} \
-  --project \"${PROJECT}\""
+  mode=train \
+  mode.is_resume=false \
+  mode.validate_interval=${VALIDATE_INTERVAL} \
+  mode.num_validation_batches=${NUM_VALIDATION_BATCHES} \
+  vla=\"${VLA_TYPE}\" \
+  dataset=\"${DATASET_TYPE}\" \
+  vla.trajectory.compression_method=\"${TRAJECTORY_COMPRESSION}\" \
+  run_root_dir=\"${RUN_ROOT_DIR}\" \
+  run_id_note=\"${CURRENT_RUN_ID}\" \
+  save_interval=\"${SAVE_INTERVAL}\" \
+  epochs=${EPOCHS} \
+  project=\"${PROJECT}\""
 
 #  --dataset.task_ids \"[0]\" \
-#  --vla.per_device_batch_size 64 \
+#  vla.optimization.per_device_batch_size=64 \
 
 # 执行训练
 echo "执行命令:"

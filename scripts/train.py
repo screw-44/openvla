@@ -1,29 +1,25 @@
 """
-train.py
-目前暂时不修改这个名字，暂时认为全量微调是更好的训练方式，lora的代码未来自己进行实现。
+train.py - VLA Training Script with Hydra + OmegaConf
+
+Hydra handles all configuration management automatically.
+
+Usage Examples:
+    python scripts/train.py                                    # Use default config
+    python scripts/train.py vla=qwen2.5-0.5b                  # Switch VLA variant
+    python scripts/train.py vla=qwen2.5-0.5b vla.optimization.learning_rate=1e-4
+    python scripts/train.py --help                            # Show all available options
+    python scripts/train.py --cfg job                         # Print resolved config
 """
 
 import re
-import os
-import sys
-import json
 
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
-import draccus
+import hydra
 import torch.distributed as dist
+from omegaconf import OmegaConf, DictConfig
 
-# 不再从 prismatic.conf.run 导入 RunConfig
-from prismatic.conf import (
-    VLAConfig,
-    VLARegistry,
-    ModeConfig,
-    ModeRegistry,
-    DatasetConfig,
-    DatasetRegistry,
-)
 from prismatic.models import load
 from prismatic.overwatch import initialize_overwatch
 from prismatic.training import VLAMetrics, get_train_strategy
@@ -31,221 +27,188 @@ from prismatic.util import set_global_seed
 from prismatic.util.vla_utils import get_vla_dataset
 from utils.training_utils import find_latest_checkpoint, warmup_trainig
 
+
+# Initialize early (before Hydra takes over)
 local_rank = warmup_trainig()
 overwatch = initialize_overwatch(__name__)
 
 
-# === RunConfig 定义（类似原始 OpenVLA 的设计）===
-@dataclass
-class RunConfig:
-    # === 运行模式配置（嵌套 ChoiceRegistry）===
-    mode: ModeConfig = field(
-        default_factory=ModeConfig.get_choice_class(ModeRegistry.TRAIN.mode_id)
-    )
-    # === VLA Model Configuration（嵌套 ChoiceRegistry）===
-    vla: VLAConfig = field(
-        default_factory=VLAConfig.get_choice_class(VLARegistry.VLA.vla_id)
-    )
-    # === Dataset Configuration（嵌套 ChoiceRegistry）===
-    dataset: DatasetConfig = field(
-        default_factory=DatasetConfig.get_choice_class(
-            DatasetRegistry.LIBERO.dataset_id
-        )
-    )
-    # === Directory Paths ===
-    run_root_dir: Path = Path("runs")  # Path to directory to store logs & checkpoints
-    # === Run Arguments ===
-    run_id: Optional[str] = None  # Run ID for logging
-    run_id_note: Optional[str] = None  # Extra note for logging
-    save_interval: int = 2500  # Interval for saving checkpoints (steps)
-    seed: int = 7  # Random seed
-    # === Training Duration Parameters ===
-    epochs: int = 100  # Epochs to Run (in case max_steps is not specified)
-    max_steps: Optional[int] = (
-        None  # [Optional] Max Gradient Steps to Run (overrides epochs)
-    )
-    # === Trackio Project Configuration ===
-    project: str = "vla-training"  # Trackio project name
+@hydra.main(version_base=None, config_path="/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/config", config_name="config")
+def train(cfg: DictConfig) -> None:
+    """Main training function - Hydra handles all config loading and composition."""
+    overwatch.info("OpenVLA Training :: Starting")
+    
+    # === Print Configuration ===
+    overwatch.info("=" * 80)
+    overwatch.info("FULL CONFIGURATION (Hydra + OmegaConf):")
+    overwatch.info(OmegaConf.to_yaml(cfg))
+    overwatch.info("=" * 80)
+    
+    # === Extract VLA, Mode, Dataset configs ===
+    vla_cfg = cfg.vla
+    mode_cfg = cfg.mode
+    dataset_cfg = cfg.dataset
+    is_validate = cfg.is_validate
+    
+    overwatch.info(f"✅ Config loaded: vla_id={vla_cfg.vla_id}, lr={vla_cfg.optimization.learning_rate}")
 
-
-@draccus.wrap()
-def train(cfg: RunConfig) -> None:
-    overwatch.info("OpenVLA Training :: Warming Up")
-
-    # === CRITICAL FIX: Re-instantiate VLA config based on vla_id parameter ===
-    # The issue: RunConfig.vla field is initialized with a hardcoded factory that uses VLARegistry.VLA.vla_id
-    # (always "base"), so even when CLI passes --vla.vla_id "qwen2.5-0.5b", the config object is still
-    # an instance of base VLAConfig with only its vla_id field modified, not a Qwen25_05B_Config instance.
-    # This means all subclass-specific fields (like base_vlm, learning_rate, per_device_batch_size) are wrong.
-    #
-    # Solution: Re-instantiate cfg.vla to get the correct config class with all correct field values.
-    if cfg.vla.vla_id and cfg.vla.vla_id != "base":
-        overwatch.info(f"Re-instantiating VLA config for type: {cfg.vla.vla_id}")
-        cfg.vla = VLAConfig.get_choice_class(cfg.vla.vla_id)()
-        overwatch.info(
-            f"✅ Loaded correct VLA config: vla_id={cfg.vla.vla_id}, "
-            f"base_vlm={cfg.vla.base_vlm}, lr={cfg.vla.learning_rate}, "
-            f"bs={cfg.vla.per_device_batch_size}"
-        )
-
-    # Configure Unique Run Name & Save Directory
-    vla_id = cfg.vla.vla_id
-    cfg.run_id = (
-        f"{vla_id}+b{cfg.vla.per_device_batch_size}+x{cfg.seed}"
-        if cfg.run_id is None
-        else cfg.run_id
-    )
-    if cfg.run_id_note is not None:
-        cfg.run_id += f"--{cfg.run_id_note}"
-
-    print("vla:", cfg.vla)
-
-    # Start =>> Build Directories and Set Randomness
+    # === Generate Run ID ===
+    vla_id = vla_cfg.vla_id
+    run_id = cfg.run_id or f"{vla_id}+b{vla_cfg.optimization.per_device_batch_size}+x{cfg.seed}"
+    if cfg.run_id_note:
+        run_id += f"--{cfg.run_id_note}"
+    
+    # === Setup Directories and Randomness ===
     worker_init_fn = set_global_seed(cfg.seed, get_worker_init_fn=True)
-    os.makedirs(run_dir := (cfg.run_root_dir / cfg.run_id), exist_ok=True)
-    os.makedirs(cfg.run_root_dir / cfg.run_id / "checkpoints", exist_ok=True)
+    run_dir = Path(cfg.run_root_dir) / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "checkpoints").mkdir(exist_ok=True)
 
-    # Save Configuration (as JSON) - only save full config, not VLA config alone
-    # (因为eval.py期望EvalConfig，而不是VLAConfig，所以只保存train_config.json)
+    # === Save Configuration ===
     if overwatch.is_rank_zero():
-        with open(run_dir / "train_config.json", "w") as f:
-            json.dump(draccus.encode(cfg), f, indent=2)
+        # Save full Hydra config as YAML (for training reference)
+        with open(run_dir / "config.yaml", "w") as f:
+            OmegaConf.save(cfg, f)
+        overwatch.info(f"Config saved to {run_dir / 'config.yaml'}")
+        
+        # Save minimal config.json for HuggingFace/LeRobot inference
+        import json
+        hf_config = {
+            "vla_id": vla_cfg.vla_id,
+            "model_id": vla_cfg.get("model_id", vla_cfg.vla_id),
+            "base_vlm": vla_cfg.get("base_vlm", vla_cfg.vla_id),
+            "type": "vla",
+            "trajectory_compression": vla_cfg.trajectory.compression_method,
+            "trajectory_converter_type": vla_cfg.trajectory.converter_type,
+            "trajectory_n_bins": vla_cfg.trajectory.n_bins,
+            "trajectory_n_dims": vla_cfg.trajectory.n_dims,
+            "action_dim": vla_cfg.get("action_dim", 7),
+            "action_horizon": vla_cfg.get("action_horizon", 1),
+            "observation_horizon": vla_cfg.get("observation_horizon", 1),
+            "model_config": {},
+        }
+        with open(run_dir / "config.json", "w") as f:
+            json.dump(hf_config, f, indent=2)
+        overwatch.info(f"HuggingFace config saved to {run_dir / 'config.json'}")
 
-    # 加载模型
+    # === Load Checkpoint (if resuming) ===
     checkpoint_to_load = None
-    if cfg.mode.is_resume:
+    if mode_cfg.is_resume:
         checkpoint_to_load = (
             find_latest_checkpoint(run_dir)
-            if cfg.mode.pretrained_checkpoint == None
-            else cfg.mode.pretrained_checkpoint
+            if mode_cfg.pretrained_checkpoint is None
+            else Path(mode_cfg.pretrained_checkpoint)
         )
         if checkpoint_to_load is None:
-            raise ValueError("No checkpoint found, But cfg mode is resume==True")
+            raise ValueError("No checkpoint found, but mode.is_resume=True")
+
+    # === Load VLM ===
     overwatch.info(
-        f"Loading VLM: path:{checkpoint_to_load}, load_for_trainig: {not cfg.mode.is_validate}"
+        f"Loading VLM (checkpoint={checkpoint_to_load}, validation={is_validate})"
     )
     vla = load(
-        vla_cfg=cfg.vla,
+        vla_cfg=vla_cfg,
         checkpoint_path=checkpoint_to_load,
-        load_for_training=not cfg.mode.is_validate,
+        load_for_training=not is_validate,
     )
 
-    # 冻结参数 Determine training "stage" based on frozen vs unfrozen parameters --> supports different fine-tuning schemes!
-    if not cfg.vla.freeze_vision_backbone and not cfg.vla.freeze_llm_backbone:
-        stage = "vla-full-train"  # Full fine-tuning
-    elif cfg.vla.freeze_vision_backbone and not cfg.vla.freeze_llm_backbone:
-        stage = "vla-train"  # Frozen vision encoder
-    elif not cfg.vla.freeze_vision_backbone and cfg.vla.freeze_llm_backbone:
-        assert (
-            cfg.vla.unfreeze_last_llm_layer
-        ), "You should unfreeze at least the last layer of your LLM!"
-        stage = "vla-sandwich-train"  # Fine-tuning vision encoder, projector, and LLM last layer
-    elif cfg.vla.freeze_vision_backbone and cfg.vla.freeze_llm_backbone:
-        assert (
-            cfg.vla.unfreeze_last_llm_layer
-        ), "Need to unfreeze at least last LLM layer to train!"
-        stage = "vla-last-layer-train"  # Fine-tuning LLM last layer only
+    # === Determine Training Stage ===
+    freeze_vision = vla_cfg.freeze_vision_backbone
+    freeze_llm = vla_cfg.freeze_llm_backbone
+    unfreeze_last = vla_cfg.unfreeze_last_llm_layer
+    
+    if not freeze_vision and not freeze_llm:
+        stage = "vla-full-train"
+    elif freeze_vision and not freeze_llm:
+        stage = "vla-train"
+    elif not freeze_vision and freeze_llm:
+        assert unfreeze_last, "Must unfreeze at least last LLM layer!"
+        stage = "vla-sandwich-train"
+    elif freeze_vision and freeze_llm:
+        assert unfreeze_last, "Must unfreeze at least last LLM layer!"
+        stage = "vla-last-layer-train"
     else:
-        raise ValueError(
-            f"Weight freezing configuration not supported. VLA config has the following parameters: freeze_vision_backbone: {cfg.vla.freeze_vision_backbone}, freeze_llm_backbone: {cfg.vla.freeze_llm_backbone}, unfreeze_last_llm_layer: {cfg.vla.unfreeze_last_llm_layer}"
-        )
-    # [Explicit] Call to `freeze_backbones` here for clarity =>> will log exactly what is/is not frozen
-    overwatch.info(
-        f"Invoking `VLM.freeze_backbones()` for `{vla_id}` => Stage: `{stage}`"
-    )
+        raise ValueError(f"Invalid freeze config: vision={freeze_vision}, llm={freeze_llm}")
+    
+    overwatch.info(f"Training stage: {stage}")
     vla.freeze_backbones(stage)
 
-    # Print number of total/trainable model parameters
+    # === Print Model Size ===
     num_params = sum(p.numel() for p in vla.parameters())
-    num_trainable_params = sum(p.numel() for p in vla.parameters() if p.requires_grad)
-    overwatch.info(
-        f"# Parameters (in millions): {num_params / 10**6:.3f} Total, {num_trainable_params / 10**6:.3f} Trainable"
-    )
+    num_trainable = sum(p.numel() for p in vla.parameters() if p.requires_grad)
+    overwatch.info(f"Model: {num_params/1e6:.1f}M params, {num_trainable/1e6:.1f}M trainable")
 
-    # Get VLA Dataset & Collator
-    overwatch.info(f"Creating VLA Dataset. ")
+    # === Create VLA Dataset ===
+    overwatch.info("Creating VLA Dataset...")
     vla_dataset, trajectory_converter, collator = get_vla_dataset(
-        data_repo_id=cfg.dataset.repo_id,
-        data_task_ids=cfg.dataset.get_task_ids(),
-        trajectory_compression_method=cfg.vla.trajectory_compression,
-        trajectory_converter_type=cfg.vla.trajectory_converter_type,
-        trajectory_n_bins=cfg.vla.trajectory_n_bins,
-        trajectory_n_dims=cfg.vla.trajectory_n_dims,
+        data_repo_id=dataset_cfg.repo_id,
+        data_task_ids=dataset_cfg.get_task_ids() if hasattr(dataset_cfg, 'get_task_ids') else None,
+        trajectory_compression_method=vla_cfg.trajectory.compression_method,
+        trajectory_converter_type=vla_cfg.trajectory.converter_type,
+        trajectory_n_bins=vla_cfg.trajectory.n_bins,
+        trajectory_n_dims=vla_cfg.trajectory.n_dims,
         base_tokenizer=vla.llm_backbone.get_tokenizer(),
         prompt_builder_fn=vla.llm_backbone.prompt_builder_fn,
         image_transform=vla.vision_backbone.get_image_transform(),
     )
 
-    # Extract resume_step and resume_epoch from checkpoint path if resuming
-    if cfg.mode.is_resume and checkpoint_to_load is not None:
+    # === Extract Resume State ===
+    resume_step, resume_epoch = 0, 0
+    if mode_cfg.is_resume and checkpoint_to_load is not None:
         filename = checkpoint_to_load.name
-        step_match, epoch_match = re.search(r"step-(\d+)", filename), re.search(
-            r"epoch-(\d+)", filename
-        )
-        resume_step, resume_epoch = int(step_match.group(1)) if step_match else 0, (
-            int(epoch_match.group(1)) if epoch_match else 0
-        )
-        overwatch.info(
-            f"Resuming from checkpoint: step={resume_step}, epoch={resume_epoch}"
-        )
-    else:
-        resume_step, resume_epoch = 0, 0
+        step_match = re.search(r"step-(\d+)", filename)
+        epoch_match = re.search(r"epoch-(\d+)", filename)
+        resume_step = int(step_match.group(1)) if step_match else 0
+        resume_epoch = int(epoch_match.group(1)) if epoch_match else 0
+        overwatch.info(f"Resuming: step={resume_step}, epoch={resume_epoch}")
 
-    # Create Train Strategy
-    overwatch.info(f"Initializing Train Strategy `{cfg.vla.train_strategy}`")
+    # === Create Train Strategy ===
+    overwatch.info(f"Initializing train strategy: {vla_cfg.optimization.train_strategy}")
     train_strategy = get_train_strategy(
-        train_strategy=cfg.vla.train_strategy,
+        train_strategy=vla_cfg.optimization.train_strategy,
         vla=vla,
-        device_id=local_rank,  # 开头指定了
+        device_id=local_rank,
         stage=stage,
         epochs=cfg.epochs,
         max_steps=cfg.max_steps,
-        global_batch_size=cfg.vla.global_batch_size,
-        per_device_batch_size=cfg.vla.per_device_batch_size,
-        learning_rate=cfg.vla.learning_rate,
-        weight_decay=cfg.vla.weight_decay,
-        max_grad_norm=cfg.vla.max_grad_norm,
-        lr_scheduler_type=cfg.vla.lr_scheduler_type,
-        warmup_ratio=cfg.vla.warmup_ratio,
-        enable_gradient_checkpointing=cfg.vla.enable_gradient_checkpointing,
-        enable_mixed_precision_training=cfg.vla.enable_mixed_precision_training,
-        reduce_in_full_precision=cfg.vla.reduce_in_full_precision,
+        global_batch_size=vla_cfg.optimization.global_batch_size,
+        per_device_batch_size=vla_cfg.optimization.per_device_batch_size,
+        learning_rate=vla_cfg.optimization.learning_rate,
+        weight_decay=vla_cfg.optimization.weight_decay,
+        max_grad_norm=vla_cfg.optimization.max_grad_norm,
+        lr_scheduler_type=vla_cfg.optimization.lr_scheduler_type,
+        warmup_ratio=vla_cfg.optimization.warmup_ratio,
+        enable_gradient_checkpointing=vla_cfg.optimization.enable_gradient_checkpointing,
+        enable_mixed_precision_training=vla_cfg.optimization.enable_mixed_precision_training,
+        reduce_in_full_precision=vla_cfg.optimization.reduce_in_full_precision,
         worker_init_fn=worker_init_fn,
     )
     train_strategy.run_setup(
-        run_dir=run_dir, n_train_examples=len(vla_dataset), is_resume=cfg.mode.is_resume
+        run_dir=run_dir,
+        n_train_examples=len(vla_dataset),
+        is_resume=mode_cfg.is_resume,
     )
 
+    # === Setup Metrics ===
     metrics = VLAMetrics(
-        cfg.run_id,
-        draccus.encode(cfg),
+        run_id,
+        OmegaConf.to_container(cfg, resolve=True),
         group="vla-train",
         resume_step=resume_step,
         resume_epoch=resume_epoch,
         project=cfg.project,
     )
 
-    # Run VLA Training Loop or Testing
-    if cfg.mode.is_validate:
-        overwatch.info("Starting VLA Valite Loop")
-        train_strategy.validate_vla(
-            vla_dataset,
-            collator,
-            metrics,
-            mode_config=cfg.mode,
-        )
-        overwatch.info("Done with Validate")
-    else:
-        overwatch.info("Starting VLA Training Loop")
-        train_strategy.train_vla(
-            vla_dataset,
-            collator,
-            metrics,
-            run_dir=run_dir,
-            save_interval=cfg.save_interval,
-            mode_config=cfg.mode,
-        )
-        overwatch.info("Done with Training =>> Finalizing Metrics")
+    # === Run Training or Validation ===
+    overwatch.info("Starting Training Loop...")
+    train_strategy.train_vla(
+        vla_dataset,
+        collator,
+        metrics,
+        run_dir=run_dir,
+        save_interval=cfg.save_interval,
+    )
+    overwatch.info("Training Complete")
 
     metrics.finalize()
     dist.barrier()

@@ -1,0 +1,12 @@
+- vla=qwen2.5-0.5b
+- mode=train
+- mode.is_resume=false
+- dataset=libero
+- vla.trajectory.compression_method=aff_uniform_bspline
+- run_root_dir=runs
+- run_id_note=1-qwen25-aff_uniform_bspline-4-h200
+- save_interval=5000
+- vla.optimization.per_device_batch_size=32
+- vla.optimization.global_batch_size=128
+- epochs=30
+- project=test

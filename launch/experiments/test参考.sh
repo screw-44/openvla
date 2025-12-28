@@ -34,7 +34,7 @@ VALIDATE_INTERVAL=500
 NUM_VALIDATION_BATCHES=200 
 
 # 训练周期配置
-EPOCHS=3
+EPOCHS=5
 
 # 项目配置
 PROJECT="test"
@@ -68,23 +68,29 @@ echo "  - Epochs: ${EPOCHS}"
 echo "  - Run ID: ${CURRENT_RUN_ID}"
 echo ""
 
-# 启动训练 - 构建命令
-TRAIN_CMD="torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} scripts/train.py \
-  --mode.type train_validate \
-  --mode.is_resume false \
-  --mode.validate_interval ${VALIDATE_INTERVAL} \
-  --mode.num_validation_batches ${NUM_VALIDATION_BATCHES} \
-  --vla.type \"${VLA_TYPE}\" \
-  --dataset.type \"${DATASET_TYPE}\" \
-  --vla.trajectory_compression \"${TRAJECTORY_COMPRESSION}\" \
-  --run_root_dir \"${RUN_ROOT_DIR}\" \
-  --run_id_note \"${CURRENT_RUN_ID}\" \
-  --save_interval \"${SAVE_INTERVAL}\" \
-  --epochs ${EPOCHS} \
-  --project \"${PROJECT}\""
+# 启动训练 - 使用 Hydra 格式的参数
+# Hydra 格式说明:
+#   - VLA 选择: vla=distilgpt2
+#   - 数据集选择: dataset=libero
+#   - 参数覆盖: vla.optimization.learning_rate=1e-4
+#   - 顶层参数: epochs=3, seed=7, project=vla-training
 
-#  --dataset.task_ids \"[0]\" \
-#  --vla.per_device_batch_size 64 \
+TRAIN_CMD="torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} scripts/train.py \
+  vla=${VLA_TYPE} \
+  dataset=${DATASET_TYPE} \
+  mode=train \
+  epochs=${EPOCHS} \
+  save_interval=${SAVE_INTERVAL} \
+  run_id_note=${CURRENT_RUN_ID} \
+  run_root_dir=${RUN_ROOT_DIR} \
+  project=${PROJECT} \
+  vla.trajectory.compression_method=${TRAJECTORY_COMPRESSION} \
+  mode.is_resume=false"
+
+# 可选的额外参数 (取消注释以使用):
+#   vla.optimization.per_device_batch_size=64 \
+#   vla.optimization.learning_rate=5e-4 \
+#   dataset.task_ids=[0] \
 
 # 执行训练
 echo "执行命令:"

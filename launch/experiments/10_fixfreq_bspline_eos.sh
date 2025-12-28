@@ -103,24 +103,24 @@ echo ""
 
 # 启动训练 - 构建命令
 TRAIN_CMD="torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} scripts/train.py \
-  --mode.type train_validate \
-  --mode.is_resume false \
-  --mode.validate_interval ${VALIDATE_INTERVAL} \
-  --mode.num_validation_batches ${NUM_VALIDATION_BATCHES} \
-  --vla.type \"${VLA_TYPE}\" \
-  --dataset.type \"${DATASET_TYPE}\" \
+  mode=train \
+  mode.is_resume=false \
+  mode.validate_interval=${VALIDATE_INTERVAL} \
+  mode.num_validation_batches=${NUM_VALIDATION_BATCHES} \
+  vla=\"${VLA_TYPE}\" \
+  dataset=\"${DATASET_TYPE}\" \
   --dataset.repo_id \"${DATASET_REPO}\" \
   --dataset.task_ids [-1] \
   --dataset.trajectory_compression \"${COMPRESSION_METHOD}\" \
-  --run_root_dir \"${RUN_ROOT_DIR}\" \
-  --run_id_note \"${CURRENT_RUN_ID}\" \
-  --save_interval \"${SAVE_INTERVAL}\" \
-  --epochs ${EPOCHS} \
-  --project \"${PROJECT}\""
+  run_root_dir=\"${RUN_ROOT_DIR}\" \
+  run_id_note=\"${CURRENT_RUN_ID}\" \
+  save_interval=\"${SAVE_INTERVAL}\" \
+  epochs=${EPOCHS} \
+  project=\"${PROJECT}\""
 
 # 如果设置了 MAX_STEPS，添加该参数
 if [ -n "${MAX_STEPS}" ]; then
-    TRAIN_CMD="${TRAIN_CMD} --max_steps ${MAX_STEPS}"
+    TRAIN_CMD="${TRAIN_CMD} max_steps=${MAX_STEPS}"
 fi
 
 # 执行训练

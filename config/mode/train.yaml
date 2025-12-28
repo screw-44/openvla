@@ -1,0 +1,7 @@
+# config/mode/train.yaml
+mode_id: train
+pretrained_checkpoint: null
+is_resume: false
+validate_save_dir: runs/validation_results
+validate_data_length: -1
+validate_checkpoint_path: null

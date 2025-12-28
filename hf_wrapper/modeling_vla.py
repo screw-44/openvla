@@ -25,7 +25,7 @@ from lerobot.processor import PolicyAction
 from transformers import GenerationMixin
 
 from prismatic.models.load import load
-from prismatic.conf.vla import VLAConfig, VLARegistry
+from .configuration_vla import VLAConfig
 from prismatic.models.vlms.vla import VLA
 from prismatic.util.vla_utils import get_vla_tokenizer
 from prismatic.vla.tokenizer import VlaTokenizer

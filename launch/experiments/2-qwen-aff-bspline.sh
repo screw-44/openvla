@@ -15,26 +15,22 @@ init_base_config
 # ============================================================================
 # 测试特定配置
 # ============================================================================
-EXPERIMENT_NAME="1-distilgpt2-stock"
+EXPERIMENT_NAME='1-qwen25-aff_uniform_bspline-4-h200'
 RUN_ID_NOTE="${EXPERIMENT_NAME}"
 
 # 模型配置
-VLA_TYPE="distilgpt2"
+VLA_TYPE="qwen2.5-0.5b"
 
 # 数据集配置
 DATASET_TYPE="libero"
 DATASET_REPO="HuggingFaceVLA/libero"
-TRAJECTORY_COMPRESSION="action_chunk"  # 显式设置轨迹压缩方法
+TRAJECTORY_COMPRESSION="aff_uniform_bspline"  # 显式设置轨迹压缩方法
 
 # 训练配置
-SAVE_INTERVAL=100
-
-# 验证配置
-VALIDATE_INTERVAL=500
-NUM_VALIDATION_BATCHES=200 
+SAVE_INTERVAL=5000
 
 # 训练周期配置
-EPOCHS=1
+EPOCHS=30
 
 # 项目配置
 PROJECT="test"
@@ -70,21 +66,19 @@ echo ""
 
 # 启动训练 - 构建命令
 TRAIN_CMD="torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} scripts/train.py \
-  --mode.type train_validate \
-  --mode.is_resume false \
-  --mode.validate_interval ${VALIDATE_INTERVAL} \
-  --mode.num_validation_batches ${NUM_VALIDATION_BATCHES} \
-  --vla.type \"${VLA_TYPE}\" \
-  --dataset.type \"${DATASET_TYPE}\" \
-  --vla.trajectory_compression \"${TRAJECTORY_COMPRESSION}\" \
-  --run_root_dir \"${RUN_ROOT_DIR}\" \
-  --run_id_note \"${CURRENT_RUN_ID}\" \
-  --save_interval \"${SAVE_INTERVAL}\" \
-  --epochs ${EPOCHS} \
-  --project \"${PROJECT}\""
+    vla=${VLA_TYPE} \
+    mode=train \
+    mode.is_resume=false \
+    dataset=${DATASET_TYPE} \
+    vla.trajectory.compression_method=${TRAJECTORY_COMPRESSION} \
+    run_root_dir=${RUN_ROOT_DIR} \
+    run_id_note=\"${CURRENT_RUN_ID}\" \
+    save_interval=${SAVE_INTERVAL} \
+    vla.optimization.per_device_batch_size=32 \
+    vla.optimization.global_batch_size=128 \
+    epochs=${EPOCHS} \
+    project=${PROJECT}"
 
-#  --dataset.task_ids \"[0]\" \
-#  --vla.per_device_batch_size 64 \
 
 # 执行训练
 echo "执行命令:"

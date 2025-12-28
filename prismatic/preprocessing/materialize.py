@@ -10,7 +10,6 @@ from typing import Tuple, Type
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizerBase
 
-from prismatic.conf import DatasetConfig
 from prismatic.models.backbones.llm.prompting import PromptBuilder
 from prismatic.models.backbones.vision import ImageTransform
 from prismatic.preprocessing.datasets import AlignDataset, FinetuneDataset

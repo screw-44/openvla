@@ -1,0 +1,19 @@
+# config/vla/qwen2.5-0.5b.yaml
+defaults:
+  - base
+
+vla_id: qwen2.5-0.5b
+model_id: qwen2.5-0.5b
+base_vlm: qwen2.5-0.5b
+vlm:
+  llm_backbone_id: qwen2.5-0.5b-instruct
+  vision_backbone_id: siglip-vit-b16-224px
+
+freeze_vision_backbone: true
+freeze_llm_backbone: false
+unfreeze_last_llm_layer: false
+
+optimization:
+  learning_rate: 5.0e-5
+  warmup_ratio: 0.05
+  per_device_batch_size: 16

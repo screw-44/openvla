@@ -1,0 +1,17 @@
+# config/config.yaml - Main Hydra config
+defaults:
+  - vla: base
+  - mode: train
+  - dataset: libero
+  - _self_
+
+# Training parameters
+run_root_dir: runs
+run_id: null
+run_id_note: null
+save_interval: 2500
+seed: 7
+epochs: 100
+max_steps: null
+project: vla-training
+is_validate: false

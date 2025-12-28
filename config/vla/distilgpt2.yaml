@@ -1,0 +1,19 @@
+# config/vla/distilgpt2.yaml
+defaults:
+  - base
+
+vla_id: distilgpt2
+model_id: distilgpt2
+base_vlm: distilgpt2
+vlm:
+  llm_backbone_id: distilgpt2
+  vision_backbone_id: siglip-vit-b16-224px
+
+freeze_vision_backbone: true
+freeze_llm_backbone: false
+unfreeze_last_llm_layer: true
+
+optimization:
+  per_device_batch_size: 64
+  learning_rate: 5.0e-4
+  warmup_ratio: 0.01

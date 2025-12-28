@@ -10,7 +10,8 @@ import os
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
-from prismatic.conf import ModelConfig, VLAConfig
+from omegaconf import OmegaConf
+
 from prismatic.models.materialize import (
     get_llm_backbone_and_tokenizer,
     get_vision_backbone_and_transform,
@@ -64,11 +65,12 @@ def _detect_model_path_type(model_id_or_path: Union[str, Path]) -> Tuple[str, Pa
         )
 
 
-def create_trajectory_converter(vla_cfg: VLAConfig, tokenizer):
+def create_trajectory_converter(vla_cfg, tokenizer):
     """Create trajectory converter from VLA config."""
-    converter_type = vla_cfg.trajectory_converter_type
-    converter_n_bins = vla_cfg.trajectory_n_bins
-    converter_n_dims = vla_cfg.trajectory_n_dims
+    # Handle both OmegaConf and regular config
+    converter_type = vla_cfg.get('trajectory', {}).get('converter_type')
+    converter_n_bins = vla_cfg.get('trajectory', {}).get('n_bins')
+    converter_n_dims = vla_cfg.get('trajectory', {}).get('n_dims')
 
     overwatch.info(
         f"Creating Trajectory Converter [bold]{converter_type}[/] "
@@ -88,60 +90,10 @@ def create_trajectory_converter(vla_cfg: VLAConfig, tokenizer):
     )
 
 
-def _load_model_config(resolved_path: Path, vla_cfg: VLAConfig) -> dict:
-    """
-    Load model configuration from checkpoint directory or VLA config.
-
-    Returns:
-        Dictionary with model configuration fields
-    """
-    config_json = resolved_path / "config.json"
-
-    # Try loading from config.json first
-    if config_json.exists():
-        with open(config_json, "r") as f:
-            config_data = json.load(f)
-        model_cfg = config_data.get("model", {})
-        if model_cfg:
-            return model_cfg
-
-    # Fallback: reconstruct from base_vlm in VLA config
-    base_vlm_id = vla_cfg.base_vlm
-    if not base_vlm_id:
-        raise ValueError(
-            "Could not determine model configuration. "
-            "No config.json found and vla_cfg.base_vlm is not set."
-        )
-
-    overwatch.info(f"Reconstructing model config from base_vlm: {base_vlm_id}")
-
-    # Extract model ID from HF path if needed
-    model_id = base_vlm_id.split("/")[-1] if "/" in base_vlm_id else base_vlm_id
-
-    try:
-        model_cfg_instance = ModelConfig.get_choice_class(model_id)()
-        return {
-            "model_id": getattr(model_cfg_instance, "model_id", model_id),
-            "vision_backbone_id": getattr(
-                model_cfg_instance, "vision_backbone_id", None
-            ),
-            "llm_backbone_id": getattr(model_cfg_instance, "llm_backbone_id", None),
-            "arch_specifier": getattr(model_cfg_instance, "arch_specifier", "gelu-mlp"),
-            "image_resize_strategy": getattr(
-                model_cfg_instance, "image_resize_strategy", "letterbox"
-            ),
-            "llm_max_length": getattr(model_cfg_instance, "llm_max_length", 2048),
-        }
-    except Exception as e:
-        raise ValueError(
-            f"Could not load model configuration from ModelConfig registry. "
-            f"base_vlm: {base_vlm_id}, error: {e}"
-        )
-
 
 # === Main Load Function ===
 def load(
-    vla_cfg: VLAConfig,
+    vla_cfg,  # Can be VLAConfig or OmegaConf DictConfig
     checkpoint_path: Optional[Union[str, Path]] = None,
     load_for_training: bool = False,
 ) -> VLA:
@@ -153,20 +105,23 @@ def load(
     - HF cached model: Model ID or HF path resolved to local cache
 
     Args:
-        vla_cfg: VLA configuration with base_vlm and trajectory converter settings
+        vla_cfg: VLA configuration with base_vlm and trajectory converter settings (VLAConfig or OmegaConf)
         checkpoint_path: Optional checkpoint path (overrides vla_cfg.base_vlm)
         load_for_training: Whether to load for training (affects freezing)
 
     Returns:
         OpenVLA model instance with trajectory converter
     """
-    # DEBUG: 打印 VLA 配置信息
+    # Handle both OmegaConf DictConfig and VLAConfig
+    base_vlm = vla_cfg.base_vlm if hasattr(vla_cfg, 'base_vlm') else vla_cfg.get('base_vlm')
+    vla_id = vla_cfg.vla_id if hasattr(vla_cfg, 'vla_id') else vla_cfg.get('vla_id')
+    
     overwatch.info(f"[DEBUG] vla_cfg type: {type(vla_cfg)}")
-    overwatch.info(f"[DEBUG] vla_cfg.vla_id: {vla_cfg.vla_id}")
-    overwatch.info(f"[DEBUG] vla_cfg.base_vlm: {vla_cfg.base_vlm}")
+    overwatch.info(f"[DEBUG] vla_id: {vla_id}")
+    overwatch.info(f"[DEBUG] base_vlm: {base_vlm}")
 
     # Determine which path to use
-    model_path = checkpoint_path if checkpoint_path else vla_cfg.base_vlm
+    model_path = checkpoint_path if checkpoint_path else base_vlm
 
     # Detect and resolve path
     path_type, resolved_path = _detect_model_path_type(model_path)
@@ -188,88 +143,22 @@ def load(
             else checkpoint_path.parent.parent
         )
 
-    # Load model configuration
-    model_cfg = _load_model_config(model_dir, vla_cfg)
+    # Load model configuration from vla_cfg.vlm
+    model_cfg = vla_cfg.get("vlm") if isinstance(vla_cfg, dict) else OmegaConf.to_container(vla_cfg.vlm)
+    if model_cfg is None:
+        model_cfg = {}
+    
+    # Ensure model_id is set from vla_cfg
+    model_id = vla_cfg.get("model_id") if isinstance(vla_cfg, dict) else vla_cfg.model_id
+    model_cfg["model_id"] = model_id
 
     overwatch.info(
         f"Model Configuration:\n"
-        f"  Model ID:         [bold blue]{model_cfg.get('model_id')}[/]\n"
         f"  Vision Backbone:  [bold]{model_cfg.get('vision_backbone_id')}[/]\n"
         f"  LLM Backbone:     [bold]{model_cfg.get('llm_backbone_id')}[/]\n"
         f"  Arch Specifier:   [bold]{model_cfg.get('arch_specifier')}[/]\n"
         f"  Checkpoint:       [underline]{checkpoint_safetensors}[/]"
     )
-
-    # Check if this is a Qwen3-VL model (integrated vision-language model)
-    model_id = model_cfg.get("model_id", "")
-    llm_backbone_id = model_cfg.get("llm_backbone_id", "")
-    is_qwen3_vl = (
-        "qwen3-vl" in model_id.lower()
-        or "qwen3-vl" in str(vla_cfg.base_vlm).lower()
-        or "qwen2-vl" in llm_backbone_id.lower()
-    )
-
-    if is_qwen3_vl:
-        # === Qwen3-VL Branch: Integrated vision-language model ===
-        overwatch.info("Detected Qwen3-VL model - using integrated pipeline")
-
-        # Extract model size from vla_cfg or model_id
-        model_size = "2B"  # default
-        if "2b" in str(vla_cfg.base_vlm).lower():
-            model_size = "2B"
-        elif "4b" in str(vla_cfg.base_vlm).lower():
-            model_size = "4B"
-        elif "7b" in str(vla_cfg.base_vlm).lower():
-            model_size = "7B"
-
-        overwatch.info(f"Qwen3-VL model size: {model_size}")
-
-        # Create trajectory converter (using Qwen3's tokenizer will be handled inside Qwen3VLA)
-        # We need a dummy tokenizer first for converter creation
-        from transformers import AutoTokenizer
-
-        try:
-            temp_tokenizer = AutoTokenizer.from_pretrained(
-                "Qwen/Qwen2-VL-2B-Instruct",
-                trust_remote_code=True,
-                local_files_only=True,
-            )
-        except:
-            # Fallback to online
-            temp_tokenizer = AutoTokenizer.from_pretrained(
-                "Qwen/Qwen2-VL-2B-Instruct",
-                trust_remote_code=True,
-            )
-
-        trajectory_converter = create_trajectory_converter(vla_cfg, temp_tokenizer)
-
-        # Initialize Qwen3VLA model
-        if checkpoint_safetensors is not None:
-            # Load from checkpoint
-            vla = Qwen3VLA.from_pretrained(
-                checkpoint_safetensors,
-                model_id=model_cfg.get("model_id", "qwen3-vl"),
-                model_size=model_size,
-                trajectory_converter=trajectory_converter,
-                enable_mixed_precision_training=load_for_training,
-            )
-        else:
-            # Create fresh Qwen3VLA model
-            overwatch.info("No checkpoint found; creating fresh Qwen3-VL model")
-            vla = Qwen3VLA(
-                model_id=model_cfg.get("model_id", "qwen3-vl"),
-                model_size=model_size,
-                trajectory_converter=trajectory_converter,
-                enable_mixed_precision_training=load_for_training,
-            )
-
-        if not load_for_training:
-            overwatch.info("Loading for inference, use evaluation mode.")
-            vla.requires_grad_(False)
-            vla.eval()
-
-        overwatch.info("✅ Successfully loaded Qwen3-VL model")
-        return vla
 
     # === Standard OpenVLA Branch: Separate vision + LLM + projector ===
     # Load base components (vision + LLM backbones)
@@ -286,7 +175,7 @@ def load(
     )
     llm_backbone, tokenizer = get_llm_backbone_and_tokenizer(
         model_cfg["llm_backbone_id"],
-        llm_max_length=model_cfg.get("llm_max_length", 2048),
+        llm_max_length=model_cfg.get("llm_max_length"),
         inference_mode=not load_for_training,
     )
 

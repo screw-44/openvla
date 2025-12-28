@@ -328,6 +328,58 @@ class AffUniformBSplineTrajectoryCompression(BaseTrajectoryCompression):
 
         return control_points
 
+    def decode_to_trajectory(
+        self, control_points: np.ndarray, num_points: int = None, original_length: int = None
+    ) -> np.ndarray:
+        """
+        从控制点解码回aff_trajectory。其实不知道解码到时候是多少个点，所以这个是一个问题（规定需要移动的距离是多少？
+
+        Args:
+            control_points: [n_control_points, dim] 的numpy数组，由 __call__() 返回的控制点
+            num_points: 解码后的轨迹点数（可选）。如果为None，使用original_length
+            original_length: 原始轨迹长度（可选）。用于重建knot vector。如果为None且num_points也为None，使用默认值100
+
+        Returns:
+            aff_trajectory: [num_points, dim] 的numpy数组，解码后的轨迹
+        """
+        dim = control_points.shape[1]
+        
+        # 确定输出点数
+        if num_points is None and original_length is None:
+            num_points = 100  # 默认值
+        elif num_points is None:
+            num_points = original_length
+        
+        # 确定用于重建knot vector的长度参数
+        if original_length is None:
+            original_length = num_points
+        
+        # 时间参数化
+        x_min, x_max = 0.0, float(original_length - 1)
+        
+        # 重构 interior_knots（与 __call__ 中相同）
+        interior_knots = np.linspace(x_min, x_max, self.target_length + 2)[1:-1]
+        
+        # 构造完整的 knot vector
+        knot_vector = np.concatenate(
+            [
+                np.repeat(x_min, self.degree + 1),
+                interior_knots,
+                np.repeat(x_max, self.degree + 1),
+            ]
+        )
+        
+        # 生成均匀的评估点
+        x_coords = np.linspace(x_min, x_max, num_points)
+        
+        # 对每个维度重构 B-spline 并评估
+        aff_trajectory = np.zeros((num_points, dim))
+        for d in range(dim):
+            bspline = BSpline(knot_vector, control_points[:, d], self.degree)
+            aff_trajectory[:, d] = bspline(x_coords)
+        
+        return aff_trajectory
+
     def get_visualization_points(
         self,
         compressed_output: np.ndarray,
