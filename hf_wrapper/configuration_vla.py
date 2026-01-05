@@ -15,37 +15,8 @@ from lerobot.configs.policies import PreTrainedConfig
 @PreTrainedConfig.register_subclass("vla")
 @dataclass
 class VLAConfig(PreTrainedConfig):
-    """
-    Minimal VLA Configuration for HuggingFace inference.
-    
-    This config only contains essential parameters needed for:
-    1. Model loading (base_vlm, vla_id)
-    2. Trajectory decoding (trajectory_compression, n_bins, n_dims, etc.)
-    3. LeRobot compatibility (action_dim, action_horizon, etc.)
-    
-    Training-specific parameters (optimization, freezing, etc.) are NOT included here.
-    They are managed by Hydra configs during training.
-    """
-    # === Model Identification ===
-    vla_id: str = "base"
-    model_id: str = "base"  # Used by VLA() for model initialization
-    base_vlm: Union[str, Path] = "distilgpt2"
-    type: str = "vla"
-    
-    # === Trajectory Configuration (needed for decoding) ===
-    trajectory_compression: str = "action_chunk"
-    trajectory_converter_type: str = "value_textualize"
-    trajectory_n_bins: int = 256
-    trajectory_n_dims: int = 7
-    
-    # === LeRobot Inference Fields ===
-    action_dim: int = 7
-    action_horizon: int = 1
-    observation_horizon: int = 1
-    
-    # === Model Config (serialized from checkpoint) ===
-    model_config: dict = field(default_factory=dict)
-    
+    """空的config, 具体参数在modeling中loading yaml"""
+    type: str = field(default="vla", init=False)  # 让 draccus 识别配置类型
     # === Optional Properties for LeRobot Compatibility ===
     @property
     def observation_delta_indices(self):

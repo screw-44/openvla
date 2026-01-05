@@ -63,7 +63,7 @@ class DistilGPT2Backbone(HFCausalLLMBackbone):
 
     @property
     def half_precision_dtype(self) -> torch.dtype:
-        return torch.float32 # 因为开不了flash attn，采用fp32训练
+        return torch.bfloat16 # 因为开不了flash attn，采用fp32训练
 
     @property
     def last_layer_finetune_modules(self) -> Sequence[nn.Module]:

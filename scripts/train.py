@@ -27,6 +27,7 @@ from prismatic.util import set_global_seed
 from prismatic.util.vla_utils import get_vla_dataset
 from utils.training_utils import find_latest_checkpoint, warmup_trainig
 
+from hydra.core.hydra_config import HydraConfig
 
 # Initialize early (before Hydra takes over)
 local_rank = warmup_trainig()
@@ -60,7 +61,7 @@ def train(cfg: DictConfig) -> None:
     
     # === Setup Directories and Randomness ===
     worker_init_fn = set_global_seed(cfg.seed, get_worker_init_fn=True)
-    run_dir = Path(cfg.run_root_dir) / run_id
+    run_dir = Path(HydraConfig.get().run.dir) / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "checkpoints").mkdir(exist_ok=True)
 
@@ -215,5 +216,46 @@ def train(cfg: DictConfig) -> None:
     dist.destroy_process_group()
 
 
+def cleanup_empty_runs(runs_base_dir: Path) -> None:
+    """
+    遍历 outputs/{日期}/{时间} 目录结构
+    如果某个时间目录下的所有模型都不包含 .safetensors 文件，则删除该时间目录
+    """
+    runs_base_dir = Path(runs_base_dir)
+    import shutil
+    # 遍历所有日期目录
+    for date_dir in runs_base_dir.iterdir():
+        if not date_dir.is_dir():
+            continue
+
+        # 记录需要删除的空时间目录
+        empty_time_dirs = []
+        for time_dir in date_dir.iterdir():
+            if not time_dir.is_dir():
+                continue
+            # 检查这个时间目录下是否存在任何 .safetensors 文件
+            has_safetensors = any(time_dir.rglob("*.safetensors"))
+            if not has_safetensors:
+                empty_time_dirs.append(time_dir)
+
+        # 删除所有空时间目录
+        for time_dir in empty_time_dirs:
+            try:
+                shutil.rmtree(time_dir)
+                overwatch.info(f"Deleted empty run directory: {time_dir}")
+            except FileNotFoundError:
+                pass
+
+        # 如果该日期目录下已无任何时间目录，则删除该日期目录
+        if not any(date_dir.iterdir()):
+            try:
+                shutil.rmtree(date_dir)
+                overwatch.info(f"Deleted empty date directory: {date_dir}")
+            except FileNotFoundError:
+                pass
+
+
 if __name__ == "__main__":
+    if overwatch.is_rank_zero():
+        cleanup_empty_runs("/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/")
     train()

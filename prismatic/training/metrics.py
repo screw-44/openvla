@@ -99,6 +99,8 @@ class VLAMetrics:
             # 2. Continuous trajectory L1 loss
             cont_pred = vla.trajectory_converter.decode_text_ids_to_trajectory(pred)
             cont_gt = vla.trajectory_converter.decode_text_ids_to_trajectory(gt)
+            # print("cont_pred:", cont_pred)
+            # print("cont_gt:", cont_gt)
             full_cont_l1_loss += torch.nn.functional.l1_loss(
                 torch.as_tensor(cont_gt), torch.as_tensor(cont_pred)
             ).item()

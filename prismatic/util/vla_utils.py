@@ -58,7 +58,7 @@ def get_vla_dataset(
     trajectory_converter_type: str = "value_textualize",
     trajectory_n_bins: int = 256,
     trajectory_n_dims: int = 7,
-) -> Tuple[Dataset, BaseTrajectoryConverter, PaddedCollatorForActionPrediction]:
+) -> Tuple[MyLeRobotDataset, BaseTrajectoryConverter, PaddedCollatorForActionPrediction]:
 
     trajectory_converter, vla_tokenizer, trajectory_compressor = get_vla_tokenizer(
         trajectory_compression_method=trajectory_compression_method,
