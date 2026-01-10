@@ -31,7 +31,6 @@ def register_trajectory_converter(name: str):
 
 
 # 不同的数据集有不同的表征方式. libero是x,y,z,yaw,pitch,row + gripper夹取。
-# TODO: 未来可以实现更复杂的TrajectoryConverter，比如VQ-VAE编码+离散化 / 多个token代表一个浮点数等方式。 / 多个token代表一个空间中的点。
 class BaseTrajectoryConverter(ABC):
     """
     其实是转换 单个浮点数(或者是轨迹上的点) 到 离散文本 的过程。

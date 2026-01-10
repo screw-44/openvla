@@ -255,6 +255,7 @@ class BSplineTrajectoryCompressionV3(BaseTrajectoryCompression):
         # print("predict values:", predict_values)
         return predict_values
 
+    # TODO: 这里decode需要添加一个设定，关于要不要使用action trunking（也可以是另外一个参数）
     def decode_to_action(
         self, control_points: np.ndarray, current_eef_pose: np.ndarray
     ) -> Tuple:

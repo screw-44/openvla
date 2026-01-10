@@ -117,7 +117,6 @@ class VLAPolicy(PreTrainedPolicy):
 
     # @torch.inference_mode()
     def select_action(self, item: Dict[str, torch.Tensor]) -> torch.Tensor: 
-        # TODO: 检查language是否有变化（更换task，目前实现不够好），如果有变化则重置current_step
         current_language = item[DATASET_ITEM_MAP_KEYS[self.dataset_name]["language"]][0]
         if self.last_language is None or self.last_language != current_language:
             self.current_step = 0
