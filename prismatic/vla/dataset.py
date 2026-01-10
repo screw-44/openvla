@@ -35,7 +35,6 @@ DATASET_ITEM_MAP_KEYS ={
 }
 
 class MyLeRobotDataset(torch.utils.data.Dataset):
-
     def __init__(
             self, 
             repo_id: str, 
@@ -48,83 +47,26 @@ class MyLeRobotDataset(torch.utils.data.Dataset):
         self.repo_id = repo_id
         self.tokenizer = tokenizer # 都在_get_item__中处理
         self.trajectory_compression = trajectory_compression
-
         self.root = real_root / repo_id
-        # self.metadata = LeRobotDatasetMetadata(repo_id, root=self.root)
+        # NOTE: 完全删除掉metadata这个类，直接离线处理，拿到episode index直接在get item中过滤。
 
-        # Initialize overwatch logger
         self.overwatch = initialize_overwatch(__name__)
-
-        # 过滤出 task-centric的 episodes；task_ids 为 None 或 [-1] 时加载全部 episodes
-        # if task_ids is None or task_ids == [-1]:
-        #     self.episodes = list(self.metadata.episodes["episode_index"])
-        #     self.overwatch.info(f"DATASET: Loading ALL episodes ({len(self.episodes)} total)")
-        # else:
-        #     self.episodes = self.get_episode_indices_for_tasks(task_ids)
-        #     self.overwatch.info(f"DATASET: Loading episodes for task_ids={task_ids} ({len(self.episodes)} episodes)")
-        #     if len(self.episodes) == 0: raise ValueError("No episodes found for the given task_ids; check dataset or filters")
-        
-        # ================== 临时修改，不用第一个episode数据来做验证模型的泛化能力
-        # self.metadata = LeRobotDatasetMetadata(repo_id, root=self.root)
-        # self.episodes = sorted(list(self.metadata.episodes["episode_index"]))[1:]
-        # self.overwatch.info(f"DATASET: Loading ALL episodes ({len(self.episodes)} total, first five {self.episodes[:5]})")
-        
-        if self.trajectory_compression.exp_type is not None:
-            delta_timestamps = {f"{self.trajectory_compression.exp_type}":[]} 
-        else:
-            delta_timestamps = None
-
         self._dataset = LeRobotDataset(
-            #"HuggingFaceVLA_cus/libero_cut_zcd_20_15_lastseg_indicator",
             repo_id,
             root=self.root,
             episodes=None, 
             image_transforms=image_transform,
-            delta_timestamps=delta_timestamps  # 获取从当前帧到 episode 结尾的完整 action 序列
-        )
-
+        ) # NOTE：不需要采用专门的delta_timestamps了，我们是从离散获取的，所以简化代码了这里
         self.overwatch.info(f"training dataset length:{len(self._dataset)}") #, validate dataset length:{len(self.val_dataset)}")
 
     @property
-    def dataset(self):
-        """动态返回训练集或验证集"""
-        return self._dataset 
-    
-    # def get_episode_indices_for_tasks(self, task_ids: list[int]) -> list[int]:
-    #     tasks = self.metadata.tasks
-    #     # 不同的repo的实现是不同的，注意这里 TODO: 未来分成不同的类
-    #     if self.repo_id.endswith("libero"):
-    #         # 对于libero的而言，根据meta中的文本string来过滤出task_id
-    #         # tasks 的 index 通常是 task_name（string），所以需要先获取对应的 task_name
-    #         task_mask = tasks["task_index"].isin(task_ids)
-    #         selected_task_str = tasks[task_mask].index.tolist()  # 获取选中的 task_name list
-            
-    #         selected_episode_metadata = self.metadata.episodes.filter(lambda x: x['tasks'][0] in selected_task_str)
-    #         result = list(selected_episode_metadata["episode_index"])
-            
-    #         return result
-    #     elif self.repo_id.endswith("pusht_image"):
-    #         pass
-    #     elif self.repo_id.endswith("2025-challenge-demos"):
-    #         pass
-    #     else: 
-    #         raise NotImplementedError(f"Unknown repo_id format: {self.repo_id}")
-    
-    def get_trajectory_for_item(self, item, **kwargs):
-        # affordance 已经从数据集中作为 tensor 字段直接获取
-        if self.trajectory_compression.exp_type is not None:
-            qurey_key = self.trajectory_compression.exp_type 
-        else:
-            qurey_key = "action"
-        
-        original_trajectory = item[qurey_key].numpy()
-        compressed_trajectory = self.trajectory_compression(original_trajectory, **kwargs)
-        return torch.Tensor(compressed_trajectory)
+    def dataset(self): return self._dataset 
 
-    def __len__(self): 
-        return len(self.dataset)
+    def __len__(self): return len(self.dataset)
         
     def __getitem__(self, index):
+        # TODO: 在这个json文件中进行读取，到tc中，然后在这里去过滤掉不进行操作的东西
+        
         # ==== 临时设置，让其不去计算0和1的index的位置，这个实现是正确的
         # import random
         # if index < 498:
@@ -139,7 +81,7 @@ class MyLeRobotDataset(torch.utils.data.Dataset):
             cam1=item[DATASET_ITEM_MAP_KEYS[self.repo_id]['cam1']],
             cam2=item[DATASET_ITEM_MAP_KEYS[self.repo_id]['cam2']],
             language=item[DATASET_ITEM_MAP_KEYS[self.repo_id]['language']],
-            trajectory=self.get_trajectory_for_item(item, frame_index=frame_index, episode_index=episode_index),
+            trajectory=self.trajectory_compression(frame_index, episode_index),
             dataset_names=self.repo_id
         )
 
