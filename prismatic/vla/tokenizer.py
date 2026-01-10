@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from os import path
+from pathlib import Path
 from typing import Any, Type, Tuple, Dict
 
 import torch
@@ -88,44 +89,52 @@ class ValueTextualizeTC(BaseTrajectoryConverter):
     
 @register_trajectory_converter("abs_aff_bspline_textualize")
 class AbsAffBsplineTextualizeTC(BaseTrajectoryConverter):
-    """将B样条控制点的浮点数离散化为bin索引，映射到vocab_size-512~vocab_size-256的token（避免与EOS token 50256冲突）"""
+    """用分位数量化B样条控制点，映射到vocab_size-512~vocab_size-256的token（避免与EOS token 50256冲突）"""
 
     def __init__(
-        self, tokenizer: PreTrainedTokenizerBase, n_bins: int = None, n_dims: int = None
+        self, tokenizer: PreTrainedTokenizerBase, n_bins: int = None, n_dims: int = None,
+        edges_path: str = None
     ):
         self.tokenizer = tokenizer
-        self.n_bins = 512 # 强制设为512
-        self.n_dims = 8 # 7+knot
-        self.bins = np.linspace(-1.0, 1.0, self.n_bins)  # 离散化的分界线
-        # self.bin_centers = (self.bins[:-1] + self.bins[1:]) / 2.0  # 每个bin的中心点
+        self.n_bins = 512  # 强制设为512
+        self.n_dims = 8    # 7+knot
         self.action_token_start = self.tokenizer.vocab_size - self.n_bins - 256  # 动作token起始位置
-        self.MIN_VALUE, self.MAX_VALUE = -98.67857360839844, 67.27767944335938
-        # NOTE: bspline会超出设定的min和max，设定一个安全距离。
-        self.bspline_safe_value_gap = 20
-        self.MIN_VALUE = self.MIN_VALUE - self.bspline_safe_value_gap
-        self.MAX_VALUE = self.MAX_VALUE + self.bspline_safe_value_gap
+        
+        # 加载分位数 edges (shape: 6, 513)
+        if edges_path is None:
+            edges_path = Path(__file__).parent / "libero_dim_bin_distribution.npy"
+        
+        self.edges = np.load(edges_path)  # shape: (6, n_bins+1)
+        assert self.edges.shape == (6, self.n_bins + 1), f"edges shape error: {self.edges.shape}"
+        # 计算每个维度的 bin center
+        self.bin_centers = np.array([
+            (self.edges[d, :-1] + self.edges[d, 1:]) / 2.0 for d in range(6)
+        ])
+        overwatch.info(f"✓ Loaded quantile edges from {edges_path}")
 
     def encode_trajectory_to_token_ids(self, trajectory: np.ndarray) -> np.ndarray:
-        # print("input trajectory:", trajectory[0:2])
-       
         bspline_trajectory, clamp_trajectory, knot_trajectory = trajectory[:, :6], trajectory[:, 6], trajectory[:, 7]
-        bspline_trajectory_norm = 2 * (bspline_trajectory - self.MIN_VALUE) / (self.MAX_VALUE - self.MIN_VALUE) - 1
-        bspline_trajectory_indices = np.digitize(bspline_trajectory_norm, self.bins) - 1
-        bspline_traj_token_ids = (self.action_token_start + bspline_trajectory_indices).astype(int)
+        
+        # 编码 bspline: 用 searchsorted 找到分位数 bin 索引
+        bspline_traj_token_ids = np.zeros_like(bspline_trajectory, dtype=int)
+        for d in range(6):
+            bin_idx = np.searchsorted(self.edges[d], bspline_trajectory[:, d], side='right') - 1
+            bin_idx = np.clip(bin_idx, 0, self.n_bins - 1)
+            bspline_traj_token_ids[:, d] = self.action_token_start + bin_idx
 
+        # 编码 clamp
         clamp_traj_token_ids = self.action_token_start + (clamp_trajectory + 1) * (self.n_bins - 1) // 2
 
+        # 编码 knot
         knot_trajectory_token_ids = self.action_token_start + knot_trajectory
-        # print(bspline_traj_token_ids.shape, clamp_traj_token_ids.shape, knot_trajectory_token_ids.shape)
-        # flatten是按照行有限的
+        
+        # 拼接所有 token
         traj_token_ids = np.concatenate([
             bspline_traj_token_ids, 
             clamp_traj_token_ids.reshape(-1, 1), 
             knot_trajectory_token_ids.reshape(-1, 1)
-            ], axis=1
-        ).flatten().astype(int)
+        ], axis=1).flatten().astype(int)
 
-        # print("output token ids:", traj_token_ids[0:2])
         return traj_token_ids
 
     def decode_text_ids_to_trajectory(self, text_ids: np.ndarray) -> np.ndarray:
@@ -134,20 +143,23 @@ class AbsAffBsplineTextualizeTC(BaseTrajectoryConverter):
         n = text_ids.shape[0] // 8
         # 还原为 (n, 8)
         tokens = text_ids.reshape(n, 8)
-        # 还原bspline部分
+        
+        # 还原 bspline: 用 bin center 来近似
         bspline_token_ids = tokens[:, :6]
-        bspline_indices = bspline_token_ids - self.action_token_start
-        bspline_indices = np.clip(bspline_indices, 0, self.n_bins - 1)
-        # bspline_norm = self.bin_centers[bspline_indices] 不采用bin center来（减少误差），承认误差的存在
-        bspline_norm = self.bins[bspline_indices]
-        bspline = (bspline_norm + 1) * (self.MAX_VALUE - self.MIN_VALUE) / 2 + self.MIN_VALUE
-        # 还原clamp
+        bspline = np.zeros((n, 6), dtype=np.float32)
+        for d in range(6):
+            bin_idx = np.clip(bspline_token_ids[:, d] - self.action_token_start, 0, self.n_bins - 1)
+            bspline[:, d] = self.bin_centers[d, bin_idx]
+        
+        # 还原 clamp
         clamp_token_ids = tokens[:, 6]
         clamp_value = (clamp_token_ids - self.action_token_start) * 2 / (self.n_bins - 1) - 1
-        # 还原knot
+        
+        # 还原 knot
         knot_token_ids = tokens[:, 7]
         knot = knot_token_ids - self.action_token_start
-        # 拼回 (n,8)
+        
+        # 拼回 (n, 8)
         trajectory = np.concatenate([bspline, clamp_value[:, None], knot[:, None]], axis=1)
         return trajectory
         

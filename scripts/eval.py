@@ -84,19 +84,21 @@ def setup_eval(model_path: Path):
 
 
 def main():
-    dir = "2025-12-30/16-00-49/qwen2.5-0.5b+b16+x7--1-qwen25-abs_aff_uniform_bspline"
+    # dir = "2025-12-30/16-00-49/qwen2.5-0.5b+b16+x7--1-qwen25-abs_aff_uniform_bspline"
+    # dir = "2026-01-05/10-44-00/qwen2.5-0.5b+b16+x7--1-qwen25-abs_aff_uniform_bspline_test_converge_on_ep0"
+    dir = "2026-01-06/09-55-16/qwen2.5-0.5b+b16+x7--1-qwen25-abs_aff_uniform_bspline_v2_test_converge_on_ep0"
     parser = argparse.ArgumentParser(
         description="简化的 VLA 评估脚本：直接读取 config.json，用软连接链接权重"
     )
     parser.add_argument(
         "--model_path",
         type=Path,
-        default="/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/output/" \
+        default="/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/" \
         f"{dir}/checkpoints/latest-checkpoint.safetensors", # latest-checkpoint  step-010000-epoch-00-loss=0.0934
         help="包含 config.json 的模型目录（如训练的 run 目录）",
     )
     # libero_10,libero_object,libero_spatial,libero_goal
-    parser.add_argument("--env_task", default="libero_10", help="环境任务")
+    parser.add_argument("--env_task", default="libero_10,libero_spatial,libero_goal", help="环境任务")
     parser.add_argument("--n_episodes", type=int, default=1, help="评估轮数")
     parser.add_argument("--batch_size", type=int, default=1, help="批大小")
     parser.add_argument(

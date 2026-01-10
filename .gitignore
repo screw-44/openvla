@@ -3,7 +3,11 @@ outputs/*
 dataset/
 .sii/*
 *.png
+*.jpg
 scripts/eval_results/*
+prismatic/vla/outputs/*
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

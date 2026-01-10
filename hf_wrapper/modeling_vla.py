@@ -60,7 +60,11 @@ class VLAPolicy(PreTrainedPolicy):
         self.reconstruct_traj = None
         self.current_step = 0
         self.last_step = 0
-        self.last_action = (0, 0, 0, 0, 0, 0, -1) # 初始位置的位置
+        self.last_action = (0, 0, 0, 0, 0, 0, -1) # 初始位置的Action
+
+        self.last_absolute_action = (0, 0, 0, 0, 0, 0, -1) # 初始位置的位置
+        self.abs_reconstruct_traj = None
+        self.last_language = None  # 用于检测language是否变化
 
     @classmethod
     def from_pretrained(
@@ -113,7 +117,14 @@ class VLAPolicy(PreTrainedPolicy):
 
     # @torch.inference_mode()
     def select_action(self, item: Dict[str, torch.Tensor]) -> torch.Tensor: 
-        self.current_step %= 10
+        # TODO: 检查language是否有变化（更换task，目前实现不够好），如果有变化则重置current_step
+        current_language = item[DATASET_ITEM_MAP_KEYS[self.dataset_name]["language"]][0]
+        if self.last_language is None or self.last_language != current_language:
+            self.current_step = 0
+            self.last_language = current_language
+            print(f"🔄 Language changed, resetting current_step to 0. New language: {current_language}")
+
+        # self.current_step %= 20
         # 每10步，计算一次模型输出，进行纠正一下contorl point
         if self.current_step == 0:
             # 然后就可以利用vla_tokenzier来进行batch的处理，变成模型可以输入的格式 （image0是评测的奇怪不同）
@@ -167,7 +178,7 @@ class VLAPolicy(PreTrainedPolicy):
             abnormal_indices = []
             
             for i in range(1, len(knot_times)):
-                if knot_times[i] <= knot_times[i-1]:  # 如果不严格递增，就是异常
+                if knot_times[i] < knot_times[i-1]:  # 如果不递增（允许knot数值重复）
                     abnormal_indices.append(i)
             
             if abnormal_indices:
@@ -208,32 +219,37 @@ class VLAPolicy(PreTrainedPolicy):
                   decoded_control_points)
 
             next_action, bspline = self.trajectory_compression.decode_to_action(
-                self.decode_control_point, current_eef_pose=self.last_action
+                self.decode_control_point, current_eef_pose=self.last_absolute_action 
             )
 
             # 重建整条轨迹：用bspline在knot时间点上采样
             knot_times = self.decode_control_point[:, -1]
             # 采样数量为 knot_times[-1] 的整数部分，从 0 到 knot_times[-1] -1 （不算最后一个点）
             self.last_step = int(knot_times[-1]) 
-            t_eval = np.arange(0, self.last_step, 0.2)
+            t_eval = np.arange(0, self.last_step, 1)
             reconstructed_traj = np.zeros((len(t_eval), 7))
             reconstructed_traj[:, :6] = bspline(t_eval)
+
+            self.abs_reconstruct_traj = reconstructed_traj
             # 变成realtive, NOTE：起始点不是00000,只能用relative来操作
             reconstructed_traj[:-1, :6] = np.diff(reconstructed_traj[:, :6], axis=0)
-            reconstructed_traj[-1] = np.array([0, 0, 0, 0, 0, 0, -1])
-            # gripper用线性插值 reconstructed_traj[:, 6] = np.interp(t_eval, knot_times, decoded_control_points[:, 6])
             # gripper采用0阶的插值方式
             indices = np.searchsorted(knot_times, t_eval, side='right') - 1
+            indices = np.clip(indices, 0, len(decoded_control_points) - 1)  # 修正gripper bug
             reconstructed_traj[:, 6] = self.decode_control_point[indices, 6]
             
+            # 添加一个结尾停止的动作
+            reconstructed_traj = np.vstack([reconstructed_traj, np.array([[0, 0, 0, 0, 0, 0, -1]])])
             self.reconstruct_traj = reconstructed_traj
             print("reconstructed traj:", self.reconstruct_traj)
 
+        # 更新一下last absolute action用来下次进行eef pose的更新
+        # self.last_absolute_action = self.abs_reconstruct_traj[self.current_step]
         action = self.reconstruct_traj[self.current_step]
         print("self.current_step:", self.current_step, " .conduct action:", action)
 
         self.current_step += 1
-        # self.current_step = min(self.current_step, self.last_step-1)
+        self.current_step = min(self.current_step, self.last_step) # 如果预测的轨迹无法执行成功，就保持不动
         self.last_action = action
         return torch.Tensor(action).unsqueeze(0)
 
