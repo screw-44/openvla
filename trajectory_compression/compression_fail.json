@@ -1,0 +1,12 @@
+{
+  "threshold": 0.5,
+  "failed_count": 1,
+  "episodes": [
+    {
+      "episode_id": 67,
+      "dataset_index": 18363,
+      "mean_error": 1.6191325738679052,
+      "task": "put both moka pots on the stove"
+    }
+  ]
+}
