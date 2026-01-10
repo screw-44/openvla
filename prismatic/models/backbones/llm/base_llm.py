@@ -23,7 +23,7 @@ from transformers import AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from prismatic.models.backbones.llm.prompting import PromptBuilder
-from prismatic.overwatch import initialize_overwatch
+from prismatic.util.overwatch import initialize_overwatch
 
 # Suppress HF Deprecation Warnings
 warnings.filterwarnings("ignore", category=FutureWarning)

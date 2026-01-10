@@ -13,7 +13,7 @@ from transformers import PreTrainedTokenizerBase
 from prismatic.models.backbones.vision.base_vision import ImageTransform
 from prismatic.models.backbones.llm.prompting.base_prompter import PromptBuilder
 from prismatic.models.vlms.prismatic import IGNORE_INDEX
-from prismatic.overwatch import initialize_overwatch
+from prismatic.util.overwatch import initialize_overwatch
 
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)

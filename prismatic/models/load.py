@@ -17,7 +17,7 @@ from prismatic.models.materialize import (
     get_vision_backbone_and_transform,
 )
 from prismatic.models.vlms import VLA, Qwen3VLA
-from prismatic.overwatch import initialize_overwatch
+from prismatic.util.overwatch import initialize_overwatch
 from prismatic.vla.tokenizer import TRAJECTORY_CONVERTER_REGISTRY
 
 from prismatic.util.hf_utils import find_model_in_cache

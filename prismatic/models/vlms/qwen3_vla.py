@@ -35,7 +35,7 @@ from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from prismatic.models.backbones.llm.prompting import PromptBuilder
 from prismatic.models.vlms.base_vlm import VLM
-from prismatic.overwatch import initialize_overwatch
+from prismatic.util.overwatch import initialize_overwatch
 from prismatic.vla.tokenizer import BaseTrajectoryConverter
 
 # Initialize Overwatch =>> Wraps `logging.Logger`

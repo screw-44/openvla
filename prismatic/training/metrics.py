@@ -17,7 +17,7 @@ import trackio
 
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from prismatic.models.vlms.vla import VLA
-from prismatic.overwatch import initialize_overwatch
+from prismatic.util.overwatch import initialize_overwatch
 
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)

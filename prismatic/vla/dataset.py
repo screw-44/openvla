@@ -21,7 +21,7 @@ from prismatic.models.backbones.vision.base_vision import ImageTransform
 from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
 from prismatic.vla.trajectory_compression import BaseTrajectoryCompression, BiningTrajectoryCompression
 from prismatic.vla.tokenizer import VlaTokenizer, BaseTrajectoryConverter
-from prismatic.overwatch import initialize_overwatch
+from prismatic.util.overwatch import initialize_overwatch
 
 
 

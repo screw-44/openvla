@@ -21,7 +21,7 @@ import torch.distributed as dist
 from omegaconf import OmegaConf, DictConfig
 
 from prismatic.models import load
-from prismatic.overwatch import initialize_overwatch
+from prismatic.util.overwatch import initialize_overwatch
 from prismatic.training import VLAMetrics, get_train_strategy
 from prismatic.util import set_global_seed
 from prismatic.util.vla_utils import get_vla_dataset

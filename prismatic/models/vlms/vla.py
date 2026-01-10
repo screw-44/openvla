@@ -13,7 +13,7 @@ from PIL import Image
 from transformers import LlamaTokenizerFast, GenerationMixin
 
 from prismatic.models.vlms.prismatic import PrismaticVLM
-from prismatic.overwatch import initialize_overwatch
+from prismatic.util.overwatch import initialize_overwatch
 from prismatic.vla.tokenizer import BaseTrajectoryConverter
 
 # Initialize Overwatch =>> Wraps `logging.Logger`

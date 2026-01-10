@@ -35,7 +35,7 @@ from torch.optim import AdamW
 from transformers.optimization import get_constant_schedule, get_cosine_schedule_with_warmup
 
 from prismatic.models.vlms import PrismaticVLM
-from prismatic.overwatch import initialize_overwatch
+from prismatic.util.overwatch import initialize_overwatch
 from prismatic.training.strategies.base_strategy import RunStrategy
 
 # Initialize Overwatch =>> Wraps `logging.Logger`
