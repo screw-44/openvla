@@ -1,12 +1,12 @@
 {
-  "threshold": 0.5,
+  "threshold": 0.1,
   "failed_count": 1,
   "episodes": [
     {
-      "episode_id": 67,
-      "dataset_index": 18363,
-      "mean_error": 1.6191325738679052,
-      "task": "put both moka pots on the stove"
+      "episode_id": 1301,
+      "dataset_index": 225271,
+      "mean_error": 0.04181710530567019,
+      "task": "pick up the black bowl next to the cookie box and place it on the plate"
     }
   ]
 }

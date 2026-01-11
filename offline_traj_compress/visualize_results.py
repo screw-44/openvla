@@ -12,7 +12,8 @@ RESULTS_JSON_PATH = Path("compression_results.json")
 VISUAL_OUTPUT_DIR = Path("visual_fig_analysis")
 DATASET_ROOT = Path("/inspire/hdd/project/robot-decision/public/datasets/") / "HuggingFaceVLA/libero"
 COMPRESSION_FAIL_PATH = Path("compression_fail.json")
-MAX_ERROR_THRESHOLD = 0.5
+MAX_ERROR_THRESHOLD = 0.1
+EPISODE_ID = 1301
 
 # ==========================================
 # 加载数据集
@@ -286,7 +287,7 @@ def main():
     # 遍历每个 episode 并可视化
     for ep_id_str, episode_data in sorted(episodes.items()):
         episode_idx = int(ep_id_str)
-        if episode_idx != 67:
+        if episode_idx != EPISODE_ID:
             continue
 
         task_name = episode_data.get("task_name", "Unknown")

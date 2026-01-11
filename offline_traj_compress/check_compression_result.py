@@ -28,7 +28,7 @@ DATASET_ROOT = Path("/inspire/hdd/project/robot-decision/public/datasets/Hugging
 
 # 是否启用验证模式（重建 B-spline 并计算误差）
 ENABLE_VALIDATION = True
-TOP_N_ERRORS = 300  # 打印前 N 个最大误差的 episode
+TOP_N_ERRORS = 250  # 打印前 N 个最大误差的 episode
 
 
 # ==========================================
@@ -271,9 +271,12 @@ def validate_episode(ep_idx: int, ep_data: Dict, dataset, episode_index_map: Dic
     return mean_error, max_error, errors_per_dim
 
 
-def validation_mode(results: Dict):
+def validation_mode(results: Dict) -> Dict:
     """
     验证模式：重建所有 B-spline 并计算实际误差
+    
+    Returns:
+        validation_stats: 包含排序后的误差记录和维度统计的字典
     """
     print("\n" + "="*80)
     print("验证模式：重建 B-spline 并计算误差")
@@ -383,6 +386,103 @@ def validation_mode(results: Dict):
             print(f"{dim_name:<12} {np.mean(dim_errors):<15.6f} {np.max(dim_errors):<15.6f} {np.std(dim_errors):<15.6f}")
     
     print("="*80 + "\n")
+    
+    # 8. 构建返回数据
+    validation_stats = {
+        "total_episodes": len(valid_records),
+        "failed_episodes": failed_count,
+        "sorted_by_mean_error": [
+            {
+                "rank": i+1,
+                "episode_idx": r["episode_idx"],
+                "mean_error": r["mean_error"],
+                "max_error": r["max_error"],
+                "num_knots": r["num_knots"],
+                "is_suboptimal": r["is_suboptimal"],
+                "json_mean_error": r["json_mean_error"]
+            }
+            for i, r in enumerate(sorted_by_mean[:TOP_N_ERRORS])
+        ],
+        "sorted_by_max_error": [
+            {
+                "rank": i+1,
+                "episode_idx": r["episode_idx"],
+                "mean_error": r["mean_error"],
+                "max_error": r["max_error"],
+                "num_knots": r["num_knots"],
+                "is_suboptimal": r["is_suboptimal"],
+                "json_mean_error": r["json_mean_error"]
+            }
+            for i, r in enumerate(sorted_by_max[:TOP_N_ERRORS])
+        ],
+        "dimension_statistics": {}
+    }
+    
+    # 添加维度统计
+    if len(all_dim_errors) > 0:
+        for i, dim_name in enumerate(dim_names):
+            dim_errors = all_dim_errors[:, i]
+            validation_stats["dimension_statistics"][dim_name] = {
+                "mean": float(np.mean(dim_errors)),
+                "max": float(np.max(dim_errors)),
+                "std": float(np.std(dim_errors))
+            }
+    
+    return validation_stats
+
+
+# ==========================================
+# 保存统计信息到 JSON
+# ==========================================
+def save_statistics_to_json(all_recompute: Set[int], categories: Dict[str, List[int]], 
+                           validation_stats: Dict = None):
+    """
+    保存统计信息到 compression_results.json
+    
+    Args:
+        all_recompute: 需要重新计算的所有 episode 集合
+        categories: 按问题类型分类的 episode 列表
+        validation_stats: 验证模式的统计数据（可选）
+    """
+    print("\n正在保存统计信息到 JSON...")
+    
+    # 1. 读取现有的 compression_results.json
+    if not RESULTS_JSON_PATH.exists():
+        print(f"❌ 错误: 文件不存在 {RESULTS_JSON_PATH}")
+        return
+    
+    with open(RESULTS_JSON_PATH, 'r') as f:
+        results = json.load(f)
+    
+    # 2. 构建 compression_statics 数据结构
+    compression_statics = {
+        "categories": {
+            category: sorted(episodes) 
+            for category, episodes in categories.items()
+        },
+        "summary": {
+            "total_recompute_episodes": len(all_recompute),
+            "recompute_episode_list": sorted(list(all_recompute))
+        }
+    }
+    
+    # 3. 添加验证统计（如果有）
+    if validation_stats is not None:
+        compression_statics["validation_statistics"] = validation_stats
+    
+    # 4. 更新或添加 compression_statics 字段
+    results["compression_statics"] = compression_statics
+    
+    # 5. 保存回 JSON 文件
+    with open(RESULTS_JSON_PATH, 'w') as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+    
+    print(f"✅ 统计信息已保存到 {RESULTS_JSON_PATH}")
+    print(f"   - 分类统计: {len(categories)} 个类别")
+    print(f"   - 需要重新计算: {len(all_recompute)} 个 episode")
+    if validation_stats is not None:
+        print(f"   - 验证统计: {validation_stats['total_episodes']} 个 episode")
+        print(f"   - Top {TOP_N_ERRORS} 误差记录已保存")
 
 
 # ==========================================
@@ -405,8 +505,12 @@ def main():
     print_statistics(all_recompute, categories)
     
     # 4. 验证模式（可选）
+    validation_stats = None
     if ENABLE_VALIDATION:
-        validation_mode(results)
+        validation_stats = validation_mode(results)
+    
+    # 5. 保存统计信息到 JSON
+    save_statistics_to_json(all_recompute, categories, validation_stats)
 
 
 if __name__ == "__main__":

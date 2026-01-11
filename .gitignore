@@ -5,7 +5,7 @@ dataset/
 *.png
 *.jpg
 scripts/eval_results/*
-prismatic/vla/outputs/*
+core/vla/outputs/*
 
 
 

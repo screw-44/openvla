@@ -20,11 +20,11 @@ import hydra
 import torch.distributed as dist
 from omegaconf import OmegaConf, DictConfig
 
-from prismatic.models import load
-from prismatic.util.overwatch import initialize_overwatch
-from prismatic.training import VLAMetrics, get_train_strategy
-from prismatic.util import set_global_seed
-from prismatic.util.vla_utils import get_vla_dataset
+from core.models import load
+from core.util.overwatch import initialize_overwatch
+from core.training import VLAMetrics, get_train_strategy
+from core.util import set_global_seed
+from core.util.vla_utils import get_vla_dataset
 from utils.training_utils import find_latest_checkpoint, warmup_trainig
 
 from hydra.core.hydra_config import HydraConfig

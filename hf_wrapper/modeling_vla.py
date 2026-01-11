@@ -24,14 +24,14 @@ from lerobot.policies.pretrained import PreTrainedPolicy
 from lerobot.processor import PolicyAction
 from transformers import GenerationMixin
 
-from prismatic.models.load import load
+from core.models.load import load
 from .configuration_vla import VLAConfig
-from prismatic.models.vlms.vla import VLA
-from prismatic.util.vla_utils import get_vla_tokenizer
-from prismatic.vla.tokenizer import BaseTrajectoryConverter, VlaTokenizer
-from prismatic.vla.trajectory_compression import BaseTrajectoryCompression
-from prismatic.models.vlms.base_vlm import VLM
-from prismatic.vla.dataset import DATASET_ITEM_MAP_KEYS
+from core.models.vlms.vla import VLA
+from core.util.vla_utils import get_vla_tokenizer
+from core.vla.tokenizer import BaseTrajectoryConverter, VlaTokenizer
+from core.vla.trajectory_compression import BaseTrajectoryCompression
+from core.models.vlms.base_vlm import VLM
+from core.vla.dataset import DATASET_ITEM_MAP_KEYS
 
 from omegaconf import DictConfig
 
