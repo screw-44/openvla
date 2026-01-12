@@ -63,8 +63,10 @@ RESULTS_JSON_PATH = Path("compression_results_v2.json")  # Modified V2
 VISUAL_DIR = Path("visual_fig_v2") # Modified dir to separate from v1
 EP_MAP_PATH = Path("epsidoe_2_dataset_index.json")
 
+TIME_LIMIT_SECONDS = 60  # 每个 episode 的求解时间限制，单位秒
+
 # 保持原有的处理列表
-PROCESS_INDEX = [1,] 
+PROCESS_INDEX = [0,] 
 
 # ==========================================
 # JSON 数据管理函数
@@ -189,9 +191,9 @@ def solve_6d_with_forced_knots(time_points, data_6d, forced_knot_times,
     # --- 性能优化配置 ---
     # 1. 降采样步长：减少约束数量
     check_step = 1
-    if T > 200: check_step = 2
-    if T > 500: check_step = 4
-    if T > 1000: check_step = 5
+    # if T > 200: check_step = 2
+    # if T > 500: check_step = 4
+    # if T > 1000: check_step = 5
 
     candidates = list(range(1, T - 1))
     forced_set = set(int(t) for t in forced_knot_times if 1 <= int(t) <= T - 2)
@@ -454,36 +456,70 @@ def load_or_build_episode_index_map(dataset) -> Dict[int, int]:
     return mapping
 
 # ==========================================
-# 4. 可视化 (保持不变，仅修改保存路径)
+# 4. 可视化 (2x4 布局，仅显示 B-spline)
 # ==========================================
-def visualize_episode(data_7d: np.ndarray, tpb_curves_7d: np.ndarray, 
+def visualize_episode(data_7d: np.ndarray,
                       bspline_curves_7d: np.ndarray, knots: List, 
                       episode_idx: int, task_name: str, x_axis: np.ndarray, 
                       save_path: Path):
-    # 代码内容与原版一致，为了节省篇幅，这里略去具体绘图代码
-    # 逻辑完全复用上一版即可
-    fig, axes = plt.subplots(2, 8, figsize=(32, 10))
+    # 创建 2 行 4 列的子图，只显示 B-spline 结果
+    fig, axes = plt.subplots(2, 4, figsize=(16, 10))
     axes = axes.flatten()
     dim_names = ["X", "Y", "Z", "Yaw", "Pitch", "Roll", "Gripper"]
-    dim_order = [0, 1, 2, 6, 3, 4, 5]
+    dim_order = [0, 1, 2, 6, 3, 4, 5]  # 7个维度
 
     for plot_idx, dim_idx in enumerate(dim_order):
-        ax = axes[plot_idx] # TPB
-        ax.scatter(x_axis, data_7d[dim_idx], s=12, color='gray', alpha=0.4)
-        ax.plot(x_axis, tpb_curves_7d[dim_idx], color='red' if dim_idx < 6 else 'green')
+        ax = axes[plot_idx]
+        ax.scatter(x_axis, data_7d[dim_idx], s=12, color='gray', alpha=0.4, label='Original')
+        ax.plot(x_axis, bspline_curves_7d[dim_idx], color='darkblue' if dim_idx < 6 else 'darkgreen', 
+                linewidth=2, label='B-spline')
         if knots:
             for k in knots:
-                ax.axvline(x=k, color='blue', linestyle='--', alpha=0.3)
-        ax.set_title(f"[TPB] {dim_names[dim_idx]}")
+                ax.axvline(x=k, color='orange', linestyle='--', alpha=0.3, linewidth=1)
+        ax.set_title(f"[B-spline] {dim_names[dim_idx]}", fontsize=11, fontweight='bold')
+        ax.set_xlabel('Time Step', fontsize=9)
+        ax.set_ylabel('Value', fontsize=9)
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc='upper right', fontsize=8)
+    
+    # 在最后一个子图显示统计信息
+    ax_stats = axes[-1]
+    ax_stats.axis('off')
+    
+    # 计算误差统计
+    errors = np.abs(bspline_curves_7d - data_7d)
+    error_mean = np.mean(errors)
+    error_max = np.max(errors)
+    error_std = np.std(errors)
+    
+    # 计算控制点数量 (knots + 边界控制点)
+    # 对于 degree=3 的 B-spline: n_control_points = n_knots + degree + 1
+    n_control_points = len(knots) + 3 + 1  # knots + degree + 1
+    
+    # 显示统计信息
+    stats_text = f"""
+Statistics Summary
+{'='*30}
 
-        ax2 = axes[plot_idx + 8] # B-spline
-        ax2.scatter(x_axis, data_7d[dim_idx], s=12, color='gray', alpha=0.4)
-        ax2.plot(x_axis, bspline_curves_7d[dim_idx], color='darkblue' if dim_idx < 6 else 'darkgreen')
-        if knots:
-            for k in knots:
-                ax2.axvline(x=k, color='orange', linestyle='--', alpha=0.3)
-        ax2.set_title(f"[B-spline] {dim_names[dim_idx]}")
+Control Points: {n_control_points}
+Internal Knots: {len(knots)}
 
+Error Metrics (L1):
+  Mean:   {error_mean:.6f}
+  Max:    {error_max:.6f}
+  Std:    {error_std:.6f}
+
+Trajectory Length: {len(x_axis)}
+Compression Ratio: {len(x_axis) / n_control_points:.2f}x
+"""
+    
+    ax_stats.text(0.1, 0.5, stats_text, transform=ax_stats.transAxes,
+                  fontsize=10, verticalalignment='center', fontfamily='monospace',
+                  bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    plt.suptitle(f"Episode {episode_idx} - B-spline Compression (Knots: {len(knots)})", 
+                 fontsize=14, fontweight='bold')
+    plt.tight_layout()
     save_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close(fig)
@@ -513,6 +549,7 @@ def process_single_episode(dataset, dataset_index: int, results: Dict) -> Option
         forced_knot_times=forced_knots,
         degree=3,
         tol_ratio=TOLERANCE,
+        time_limit=TIME_LIMIT_SECONDS,
         use_gurobi=False  # 默认使用 CBC，改为 True 可使用 Gurobi
     )
     
@@ -570,14 +607,21 @@ def process_single_episode(dataset, dataset_index: int, results: Dict) -> Option
     # 计算误差
     bspline_overall_mean = float(np.mean(np.abs(bspline_curves_7d - data_7d)))
     
+    # 构造完整的 knot vector (包含前后重复端点)
+    # 对于 degree=3: [t0, t0, t0, t0, internal_knots..., t_end, t_end, t_end, t_end]
+    t0, t_end = int(x_axis[0]), int(x_axis[-1])
+    full_knots_vector = (
+        [t0] * 4 +  # degree + 1 = 4 个起始点
+        sorted([int(k) for k in knots]) +  # 内部 knots
+        [t_end] * 4  # degree + 1 = 4 个结束点
+    )
+    
     # 可视化
     vis_path = VISUAL_DIR / f"episode_{episode_idx}.jpg"
-    tpb_curves_7d = np.vstack([curves_6d, bspline_curves_7d[6]]) # TPB 暂用 B-spline 的 gripper
-    visualize_episode(data_7d, tpb_curves_7d, bspline_curves_7d, knots, 
+    visualize_episode(data_7d, bspline_curves_7d, knots, 
                       episode_idx, task_name, x_axis, vis_path)
     
     # 4. 构造结果 (V2 格式)
-    # [Requirement] knot_vector 只保存一份 (internal_knots)
     episode_result = {
         "episode_index": episode_idx,
         "task_name": task_name,
@@ -587,7 +631,9 @@ def process_single_episode(dataset, dataset_index: int, results: Dict) -> Option
             # Shared Metadata
             "degree_arm": 3,
             "degree_gripper": 0,
-            "internal_knots": [int(k) for k in knots], # [Requirement] Int List, Shared
+            
+            # 完整的 knot vector (可直接用于 B-spline 解码)
+            "knots_vector": full_knots_vector, 
             
             # Control Points (7 Dims)
             "control_points": bspline_control_points,
