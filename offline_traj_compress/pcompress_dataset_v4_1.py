@@ -17,6 +17,35 @@
     # 1524, 1535, 1550, 1553, 1560, 1562, 1565, 1570, 1574, 1577, 1602, 
     # 1610, 1615, 1616, 1617, 1622, 1630, 1646, 1653, 1659, 1660, 1662, 
     # 1667, 1669, 1671, 1672, 1677, 1680, 1682, 1685] # 仅仅需要处理的index
+
+#  "internal_knots": [
+        #   11,
+        #   19,
+        #   31,
+        #   45,
+        #   54,
+        #   64,
+        #   72,
+        #   84,
+        #   93,
+        #   113,
+        #   118,
+        #   121,
+        #   132,
+        #   146,
+        #   152,
+        #   163,
+        #   172,
+        #   188,
+        #   193,
+        #   209,
+        #   215,
+        #   229,
+        #   234,
+        #   246,
+        #   257,
+        #   265
+        # ],
 import numpy as np
 import pulp
 import matplotlib.pyplot as plt
@@ -145,124 +174,230 @@ def reconstruct_bspline_trajectory(control_points: np.ndarray, knot_vector: np.n
 # ==========================================
 # 2. 求解器 (核心修改部分)
 # ==========================================
-def solve_6d_with_forced_knots(time_points, data_6d, forced_knot_times, degree=3, tol_ratio=0.03, time_limit=600):
+def solve_6d_with_forced_knots(time_points, data_6d, forced_knot_times,
+                               degree=3, tol_ratio=0.03, time_limit=600, 
+                               use_gurobi=False):
+    """
+    使用 PuLP 前端建模，支持 CBC 和 Gurobi 求解器
+    
+    Args:
+        use_gurobi: 如果为 True 且 Gurobi 可用，则使用 Gurobi；否则使用 CBC
+    """
+    T = len(time_points)
     num_dims = data_6d.shape[0]
+
+    # --- 性能优化配置 ---
+    # 1. 降采样步长：减少约束数量
+    check_step = 1
+    if T > 200: check_step = 2
+    if T > 500: check_step = 4
+    if T > 1000: check_step = 5
+
+    candidates = list(range(1, T - 1))
+    forced_set = set(int(t) for t in forced_knot_times if 1 <= int(t) <= T - 2)
+
+    # 1. 构造最大均匀 Knot
+    t0, t_end = float(time_points[0]), float(time_points[-1])
+    internal = np.arange(1, T - 1, dtype=float)
+    U = np.concatenate([np.repeat(t0, degree + 1), internal, np.repeat(t_end, degree + 1)])
+    n_basis = len(U) - degree - 1
+
+    # 2. 预计算 B 矩阵 (只计算 check_step 覆盖的点)
+    indices_to_check = list(range(0, T, check_step))
+    if (T - 1) not in indices_to_check:
+        indices_to_check.append(T - 1)
+
+    from scipy.interpolate import BSpline
+    # B_check 用于约束检查
+    B_check = np.zeros((len(indices_to_check), n_basis), dtype=float)
+    eye = np.eye(n_basis, dtype=float)
+    for j in range(n_basis):
+        bj = BSpline(U, eye[j], degree, extrapolate=False)
+        vals = bj(time_points)
+        B_check[:, j] = vals[indices_to_check]
+
+    row_nz_check = [np.where(B_check[i] > 1e-12)[0].tolist() for i in range(len(indices_to_check))]
+
+    # ==========================================
+    # 阶段一：快速 L1 松弛预求解 (连续变量)
+    # ==========================================
+    print(f"  [Step 1] 运行 L1 松弛预求解 (连续松弛)...")
     
-    # [Modify 1] 预处理强制Knots，确保为Set以便操作
-    forced_indices = set(int(t) for t in forced_knot_times)
+    prob_lp = pulp.LpProblem("BSpline_L1_Relaxed", pulp.LpMinimize)
     
-    # [Modify 2] 生成基础候选集，并取并集
-    # 假设基础候选步长为1 (time_points[1:-1])
-    # 如果要降采样加速，可以改为 range(1, len(time_points)-1, 5) 等
-    base_indices = set(range(1, len(time_points) - 1))
-    
-    # 关键：强制 Knot 必须存在于候选列表中
-    candidate_indices_set = base_indices.union(forced_indices)
-    candidate_knots = sorted(list(candidate_indices_set))
-
-    prob = pulp.LpProblem("RobotArm_6D_Constrained", pulp.LpMinimize)
-
-    # 定义二值变量 y
-    y = pulp.LpVariable.dicts("y", candidate_knots, cat="Binary")
-
-    # [Modify 3] 直接添加强制 Knot 约束 (Hard Constraint)
-    forced_count = 0
-    for f_idx in forced_indices:
-        # 由于上面取了并集，f_idx 一定在 candidate_knots 中
-        prob += y[f_idx] == 1
-        forced_count += 1
-    
-    print(f"  [Info] 已将 {forced_count} 个 Gripper 变化点锁定为强制 Knots (直接约束)")
-
-    # 定义其他 MILP 变量
-    alpha = {}
-    beta = {}
-    BigMs = []
-    epsilons = []
-
+    # 变量定义 - 控制点
+    c_lp = {}
     for d in range(num_dims):
-        d_range = np.max(data_6d[d]) - np.min(data_6d[d])
-        if d_range < 1e-6:
-            d_range = 1.0
-
-        eps = d_range * tol_ratio
-        epsilons.append(eps)
-        BigMs.append(d_range * 1) # NOTE M=1
+        for j in range(n_basis):
+            c_lp[(d, j)] = pulp.LpVariable(f"c_{d}_{j}", lowBound=None, cat='Continuous')
+    
+    # 变量定义 - y (连续松弛 [0,1])
+    y_lp = {}
+    for k in candidates:
+        y_lp[k] = pulp.LpVariable(f"y_{k}", lowBound=0.0, upBound=1.0, cat='Continuous')
+    
+    # 强制 Knot 约束
+    for k in forced_set:
+        prob_lp += y_lp[k] == 1, f"forced_knot_{k}"
+    
+    # Delta^4 约束 (Big-M)
+    g_lp = {}
+    M_relax = 200.0
+    for d in range(num_dims):
+        for k in candidates:
+            i = k + 3
+            g_lp[(d, k)] = pulp.LpVariable(f"g_{d}_{k}", lowBound=None, cat='Continuous')
+            
+            # Delta^4 定义
+            delta4_expr = (c_lp[(d, i)] - 4.0 * c_lp[(d, i-1)] + 6.0 * c_lp[(d, i-2)] 
+                          - 4.0 * c_lp[(d, i-3)] + c_lp[(d, i-4)])
+            prob_lp += g_lp[(d, k)] == delta4_expr, f"delta4_def_{d}_{k}"
+            
+            # Big-M 约束: |g| <= M * y
+            prob_lp += g_lp[(d, k)] <= M_relax * y_lp[k], f"bigM_upper_{d}_{k}"
+            prob_lp += g_lp[(d, k)] >= -M_relax * y_lp[k], f"bigM_lower_{d}_{k}"
+    
+    # 拟合误差约束
+    for d in range(num_dims):
+        d_range = float(np.max(data_6d[d]) - np.min(data_6d[d]))
+        if d_range < 1e-6: d_range = 1.0
+        eps = d_range * float(tol_ratio)
         
-        alpha[d] = pulp.LpVariable.dicts(f"alpha_{d}", range(degree + 1), lowBound=None)
-        beta[d] = pulp.LpVariable.dicts(f"beta_{d}", candidate_knots, lowBound=None)
-
-    # 目标函数：最小化 Knot 总数
-    total_knots = pulp.lpSum([y[j] for j in candidate_knots])
-    prob += total_knots
-    # prob += total_knots >= max(5, forced_count) # 下界至少是强制点的数量
-    # prob += total_knots <= 70
-
-    # 拟合约束
-    for d in range(num_dims):
-        M_d = BigMs[d]
-        eps_d = epsilons[d]
-
-        for j in candidate_knots:
-            prob += beta[d][j] <= M_d * y[j]
-            prob += beta[d][j] >= -M_d * y[j]
-
-        # 采样点约束 (为了加速，可以适当对 time_points 降采样进行约束检查，这里保持全量)
-        for i, t_val in enumerate(time_points):
-            P_val = data_6d[d][i]
+        for idx_in_check, real_t_idx in enumerate(indices_to_check):
+            P = float(data_6d[d][real_t_idx])
+            idxs = row_nz_check[idx_in_check]
             
-            # 多项式部分
-            poly_part = pulp.lpSum([alpha[d][k] * (t_val**k) for k in range(degree + 1)])
-            
-            # Knot 修正部分
-            # 注意：只对 t_val > j 的项求和
-            knot_terms = [beta[d][j] * ((t_val - j) ** degree) for j in candidate_knots if t_val > j]
-            
-            S_t = poly_part + pulp.lpSum(knot_terms)
-            prob += S_t - P_val <= eps_d
-            prob += P_val - S_t <= eps_d
-
-    cpu_cores = multiprocessing.cpu_count()
-    print(f"正在求解 6D 轨迹... Tol: {tol_ratio*100}% | Solver: CBC ({cpu_cores} core)")
+            fit_expr = pulp.lpSum([float(B_check[idx_in_check, j]) * c_lp[(d, j)] for j in idxs])
+            prob_lp += fit_expr - P <= eps, f"fit_upper_{d}_{idx_in_check}"
+            prob_lp += P - fit_expr <= eps, f"fit_lower_{d}_{idx_in_check}"
     
-    solver = pulp.PULP_CBC_CMD(msg=True, threads=cpu_cores, timeLimit=time_limit)
-    # solver = pulp.GUROBI(msg=True, threads=cpu_cores, timeLimit=time_limit)
-    prob.solve(solver)
+    # 目标函数：最小化 sum(y)
+    prob_lp += pulp.lpSum([y_lp[k] for k in candidates]), "minimize_knots"
+    
+    # 选择求解器
+    cpu_cores = multiprocessing.cpu_count()
+    if use_gurobi:
+        try:
+            solver_lp = pulp.GUROBI(msg=False, threads=cpu_cores, timeLimit=time_limit)
+        except:
+            print("  [Warning] Gurobi 不可用，使用 CBC")
+            solver_lp = pulp.PULP_CBC_CMD(msg=False, threads=cpu_cores, timeLimit=time_limit)
+    else:
+        solver_lp = pulp.PULP_CBC_CMD(msg=False, threads=cpu_cores, timeLimit=time_limit)
+    
+    prob_lp.solve(solver_lp)
+    
+    # 收集松弛解
+    warm_start_values = {}
+    if prob_lp.status == pulp.LpStatusOptimal:
+        knot_guess_count = 0
+        for k in candidates:
+            val = pulp.value(y_lp[k])
+            if val > 0.01:
+                warm_start_values[k] = 1
+                knot_guess_count += 1
+            else:
+                warm_start_values[k] = 0
+        print(f"  -> L1 预估 Knot 数: {knot_guess_count}")
+    else:
+        print("  [Warning] L1 预求解失败，将直接运行 MILP")
 
-    status_str = pulp.LpStatus[prob.status]
-    objective_val = pulp.value(prob.objective)
-    is_suboptimal = False
-
-    if status_str != "Optimal":
-        if objective_val is not None:
-            print(f"  [Info] 次优解 (Knots: {int(objective_val)}) | Status: {status_str}")
-            is_suboptimal = True
-        else:
-            print(f"  [Error] 求解失败。Status: {status_str}")
-            return [], None, False
-
-    knot_count = pulp.value(prob.objective)
-    print(f"  -> 状态: {status_str}, 总 Knot 数: {int(knot_count)}")
-
-    # 提取激活的 knots
-    active_knots = [j for j in candidate_knots if pulp.value(y[j]) > 0.5]
-    # 确保是 int
-    active_knots = [int(k) for k in active_knots]
-
-    # 重建 MILP 的拟合曲线 (仅用于检查)
-    fitted_curves = np.zeros_like(data_6d)
+    # ==========================================
+    # 阶段二：MILP 求解 (二值变量)
+    # ==========================================
+    print(f"  [Step 2] 运行 MILP 精细求解...")
+    
+    prob_milp = pulp.LpProblem("BSpline_MILP", pulp.LpMinimize)
+    
+    # 变量定义 - 控制点
+    c_milp = {}
     for d in range(num_dims):
-        a_vals = [pulp.value(alpha[d][k]) for k in range(degree + 1)]
-        b_vals = {j: pulp.value(beta[d][j]) for j in candidate_knots}
-        for i, t_val in enumerate(time_points):
-            val = sum([a_vals[k] * (t_val**k) for k in range(degree + 1)])
-            for j in candidate_knots:
-                if t_val > j:
-                    val += b_vals[j] * ((t_val - j) ** degree)
-            fitted_curves[d, i] = val
-
+        for j in range(n_basis):
+            c_milp[(d, j)] = pulp.LpVariable(f"c_{d}_{j}", lowBound=None, cat='Continuous')
+    
+    # 变量定义 - y (二值变量)
+    y_milp = {}
+    for k in candidates:
+        # 如果有 warm start，用作初始猜测（PuLP/CBC 不完全支持，但不影响）
+        y_milp[k] = pulp.LpVariable(f"y_{k}", cat='Binary')
+    
+    # 强制 Knot 约束
+    for k in forced_set:
+        prob_milp += y_milp[k] == 1, f"forced_knot_{k}"
+    
+    # Delta^4 约束 (Big-M)
+    g_milp = {}
+    M_milp = 200.0
+    for d in range(num_dims):
+        for k in candidates:
+            i = k + 3
+            g_milp[(d, k)] = pulp.LpVariable(f"g_{d}_{k}", lowBound=None, cat='Continuous')
+            
+            # Delta^4 定义
+            delta4_expr = (c_milp[(d, i)] - 4.0 * c_milp[(d, i-1)] + 6.0 * c_milp[(d, i-2)] 
+                          - 4.0 * c_milp[(d, i-3)] + c_milp[(d, i-4)])
+            prob_milp += g_milp[(d, k)] == delta4_expr, f"delta4_def_{d}_{k}"
+            
+            # Big-M 约束
+            prob_milp += g_milp[(d, k)] <= M_milp * y_milp[k], f"bigM_upper_{d}_{k}"
+            prob_milp += g_milp[(d, k)] >= -M_milp * y_milp[k], f"bigM_lower_{d}_{k}"
+    
+    # 拟合误差约束
+    for d in range(num_dims):
+        d_range = float(np.max(data_6d[d]) - np.min(data_6d[d]))
+        if d_range < 1e-6: d_range = 1.0
+        eps = d_range * float(tol_ratio)
+        
+        for idx_in_check, real_t_idx in enumerate(indices_to_check):
+            P = float(data_6d[d][real_t_idx])
+            idxs = row_nz_check[idx_in_check]
+            
+            fit_expr = pulp.lpSum([float(B_check[idx_in_check, j]) * c_milp[(d, j)] for j in idxs])
+            prob_milp += fit_expr - P <= eps, f"fit_upper_{d}_{idx_in_check}"
+            prob_milp += P - fit_expr <= eps, f"fit_lower_{d}_{idx_in_check}"
+    
+    # 目标函数
+    prob_milp += pulp.lpSum([y_milp[k] for k in candidates]), "minimize_knots"
+    
+    # 选择求解器
+    if use_gurobi:
+        try:
+            solver_milp = pulp.GUROBI(msg=True, threads=cpu_cores, timeLimit=time_limit)
+        except:
+            print("  [Warning] Gurobi 不可用，使用 CBC")
+            solver_milp = pulp.PULP_CBC_CMD(msg=True, threads=cpu_cores, timeLimit=time_limit)
+    else:
+        solver_milp = pulp.PULP_CBC_CMD(msg=True, threads=cpu_cores, timeLimit=time_limit)
+    
+    prob_milp.solve(solver_milp)
+    
+    # ==========================================
+    # 结果提取
+    # ==========================================
+    is_suboptimal = False
+    status = prob_milp.status
+    
+    if status == pulp.LpStatusOptimal:
+        status_str = "Optimal"
+    elif status in (pulp.LpStatusNotSolved, pulp.LpStatusUndefined):
+        print(f"  [Error] 求解失败。Status={pulp.LpStatus[status]}")
+        return [], None, False
+    else:
+        status_str = pulp.LpStatus[status]
+        is_suboptimal = True
+    
+    # 提取激活的 knots
+    active_knots = [int(k) for k in candidates if pulp.value(y_milp[k]) > 0.5]
+    
+    # 重建曲线
+    fitted_curves = np.zeros_like(data_6d, dtype=float)
+    for d in range(num_dims):
+        ctrl_pts = [pulp.value(c_milp[(d, j)]) for j in range(n_basis)]
+        spl = BSpline(U, ctrl_pts, degree, extrapolate=False)
+        fitted_curves[d] = spl(time_points)
+    
+    print(f"  -> 状态: {status_str}, Knot 数: {len(active_knots)}")
     return active_knots, fitted_curves, is_suboptimal
-
 # ==========================================
 # 3. 数据加载与处理
 # ==========================================
@@ -371,12 +506,14 @@ def process_single_episode(dataset, dataset_index: int, results: Dict) -> Option
     print(f"  强制 Knot (来自 Gripper): {forced_knots}")
     
     # 2. 求解 6D 轨迹 (传入强制列表)
+    # use_gurobi=True 使用 Gurobi (如果可用)，False 使用 CBC
     knots, curves_6d, is_suboptimal = solve_6d_with_forced_knots(
         time_points=x_axis,
         data_6d=data_6d,
         forced_knot_times=forced_knots,
         degree=3,
-        tol_ratio=TOLERANCE
+        tol_ratio=TOLERANCE,
+        use_gurobi=False  # 默认使用 CBC，改为 True 可使用 Gurobi
     )
     
     if curves_6d is None:

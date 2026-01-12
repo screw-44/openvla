@@ -17,6 +17,35 @@
     # 1524, 1535, 1550, 1553, 1560, 1562, 1565, 1570, 1574, 1577, 1602, 
     # 1610, 1615, 1616, 1617, 1622, 1630, 1646, 1653, 1659, 1660, 1662, 
     # 1667, 1669, 1671, 1672, 1677, 1680, 1682, 1685] # 仅仅需要处理的index
+
+#  "internal_knots": [
+        #   11,
+        #   19,
+        #   31,
+        #   45,
+        #   54,
+        #   64,
+        #   72,
+        #   84,
+        #   93,
+        #   113,
+        #   118,
+        #   121,
+        #   132,
+        #   146,
+        #   152,
+        #   163,
+        #   172,
+        #   188,
+        #   193,
+        #   209,
+        #   215,
+        #   229,
+        #   234,
+        #   246,
+        #   257,
+        #   265
+        # ],
 import numpy as np
 import pulp
 import matplotlib.pyplot as plt
@@ -30,7 +59,7 @@ from scipy.interpolate import BSpline, make_lsq_spline
 # Configuration
 # ==========================================
 TOLERANCE = 0.01
-RESULTS_JSON_PATH = Path("compression_results_v2.json")  # Modified V2
+RESULTS_JSON_PATH = Path("gd_compression_results_v1.json")  # Modified V2
 VISUAL_DIR = Path("visual_fig_v2") # Modified dir to separate from v1
 EP_MAP_PATH = Path("epsidoe_2_dataset_index.json")
 
@@ -145,123 +174,279 @@ def reconstruct_bspline_trajectory(control_points: np.ndarray, knot_vector: np.n
 # ==========================================
 # 2. 求解器 (核心修改部分)
 # ==========================================
-def solve_6d_with_forced_knots(time_points, data_6d, forced_knot_times, degree=3, tol_ratio=0.03, time_limit=600):
-    num_dims = data_6d.shape[0]
-    
-    # [Modify 1] 预处理强制Knots，确保为Set以便操作
-    forced_indices = set(int(t) for t in forced_knot_times)
-    
-    # [Modify 2] 生成基础候选集，并取并集
-    # 假设基础候选步长为1 (time_points[1:-1])
-    # 如果要降采样加速，可以改为 range(1, len(time_points)-1, 5) 等
-    base_indices = set(range(1, len(time_points) - 1))
-    
-    # 关键：强制 Knot 必须存在于候选列表中
-    candidate_indices_set = base_indices.union(forced_indices)
-    candidate_knots = sorted(list(candidate_indices_set))
+def solve_6d_with_forced_knots(
+    time_points,
+    data_6d,
+    forced_knot_times,
+    degree=3,
+    tol_ratio=0.03,
+    time_limit=600,
+):
+    """
+    R1: 6D group trend filtering (order=3 cubic) via sparse 4th-difference.
+    Solve:
+        min_X 0.5||X - Y||_F^2 + lam * sum_t ||(D4 X)_[:,t]||_2
+    where D4 is 4th finite difference along time.
 
-    prob = pulp.LpProblem("RobotArm_6D_Constrained", pulp.LpMinimize)
+    Then infer knots from non-zero group norms of D4X.
+    Forced knots: do not shrink corresponding D4 positions.
 
-    # 定义二值变量 y
-    y = pulp.LpVariable.dicts("y", candidate_knots, cat="Binary")
+    Returns:
+        active_knots: List[int] in [1, T-2]
+        fitted_curves: np.ndarray shape (6, T)
+        is_suboptimal: bool
+    """
+    import time
+    import numpy as np
+    import torch
+    import torch.nn.functional as F
 
-    # [Modify 3] 直接添加强制 Knot 约束 (Hard Constraint)
-    forced_count = 0
-    for f_idx in forced_indices:
-        # 由于上面取了并集，f_idx 一定在 candidate_knots 中
-        prob += y[f_idx] == 1
-        forced_count += 1
-    
-    print(f"  [Info] 已将 {forced_count} 个 Gripper 变化点锁定为强制 Knots (直接约束)")
+    assert degree == 3, "R1这里按 cubic(=3) 做：四阶差分稀疏。"
+    start_time = time.time()
 
-    # 定义其他 MILP 变量
-    alpha = {}
-    beta = {}
-    BigMs = []
-    epsilons = []
+    # ----------------------------
+    # basic setup
+    # ----------------------------
+    Y_np = np.asarray(data_6d, dtype=np.float32)  # (6, T)
+    D, T = Y_np.shape
+    if T < 6:
+        # 太短没法做四阶差分，直接返回原数据
+        knots = sorted(set(int(t) for t in forced_knot_times if 1 <= int(t) <= T - 2))
+        return knots, Y_np, False
 
-    for d in range(num_dims):
-        d_range = np.max(data_6d[d]) - np.min(data_6d[d])
-        if d_range < 1e-6:
-            d_range = 1.0
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    Y = torch.from_numpy(Y_np).to(device)  # (6, T)
 
-        eps = d_range * tol_ratio
-        epsilons.append(eps)
-        BigMs.append(d_range * 1) # NOTE M=1
-        
-        alpha[d] = pulp.LpVariable.dicts(f"alpha_{d}", range(degree + 1), lowBound=None)
-        beta[d] = pulp.LpVariable.dicts(f"beta_{d}", candidate_knots, lowBound=None)
+    # tolerance (L∞ per-dim)
+    ranges = np.max(Y_np, axis=1) - np.min(Y_np, axis=1)
+    ranges[ranges < 1e-6] = 1.0
+    eps = torch.from_numpy((ranges * float(tol_ratio)).astype(np.float32)).to(device)  # (6,)
 
-    # 目标函数：最小化 Knot 总数
-    total_knots = pulp.lpSum([y[j] for j in candidate_knots])
-    prob += total_knots
-    # prob += total_knots >= max(5, forced_count) # 下界至少是强制点的数量
-    # prob += total_knots <= 70
+    forced_set = set(int(t) for t in forced_knot_times if 1 <= int(t) <= T - 2)
 
-    # 拟合约束
-    for d in range(num_dims):
-        M_d = BigMs[d]
-        eps_d = epsilons[d]
+    # D4 index r maps to "knot time" r+2 (center of 5-point stencil)
+    # r ranges [0, T-5] => knot time in [2, T-3]
+    forced_r = set()
+    for k in forced_set:
+        r = k - 2
+        if 0 <= r <= T - 5:
+            forced_r.add(r)
 
-        for j in candidate_knots:
-            prob += beta[d][j] <= M_d * y[j]
-            prob += beta[d][j] >= -M_d * y[j]
+    # ----------------------------
+    # build D4 and D4^T via depthwise conv1d
+    # ----------------------------
+    # kernel for 4th finite difference: [1, -4, 6, -4, 1]
+    k = torch.tensor([1.0, -4.0, 6.0, -4.0, 1.0], device=device, dtype=torch.float32)
+    w = k.view(1, 1, 5).repeat(D, 1, 1)  # (D,1,5) depthwise
 
-        # 采样点约束 (为了加速，可以适当对 time_points 降采样进行约束检查，这里保持全量)
-        for i, t_val in enumerate(time_points):
-            P_val = data_6d[d][i]
-            
-            # 多项式部分
-            poly_part = pulp.lpSum([alpha[d][k] * (t_val**k) for k in range(degree + 1)])
-            
-            # Knot 修正部分
-            # 注意：只对 t_val > j 的项求和
-            knot_terms = [beta[d][j] * ((t_val - j) ** degree) for j in candidate_knots if t_val > j]
-            
-            S_t = poly_part + pulp.lpSum(knot_terms)
-            prob += S_t - P_val <= eps_d
-            prob += P_val - S_t <= eps_d
+    def d4(x_DT):
+        # x_DT: (D, T) -> (D, T-4)
+        x = x_DT.unsqueeze(0)  # (1,D,T)
+        out = F.conv1d(x, w, padding=0, groups=D)  # (1,D,T-4)
+        return out.squeeze(0)
 
-    cpu_cores = multiprocessing.cpu_count()
-    print(f"正在求解 6D 轨迹... Tol: {tol_ratio*100}% | Solver: CBC ({cpu_cores} core)")
-    
-    solver = pulp.PULP_CBC_CMD(msg=True, threads=cpu_cores, timeLimit=time_limit)
-    # solver = pulp.GUROBI(msg=True, threads=cpu_cores, timeLimit=time_limit)
-    prob.solve(solver)
+    def d4T(v_DTm4):
+        # v_DTm4: (D, T-4) -> (D, T)  using padding=4 gives length T
+        v = v_DTm4.unsqueeze(0)  # (1,D,T-4)
+        out = F.conv1d(v, w, padding=4, groups=D)  # (1,D,T)
+        return out.squeeze(0)
 
-    status_str = pulp.LpStatus[prob.status]
-    objective_val = pulp.value(prob.objective)
-    is_suboptimal = False
+    # Linear operator A(x)= x + rho * D4^T D4 x
+    def A(x_DT, rho):
+        return x_DT + rho * d4T(d4(x_DT))
 
-    if status_str != "Optimal":
-        if objective_val is not None:
-            print(f"  [Info] 次优解 (Knots: {int(objective_val)}) | Status: {status_str}")
-            is_suboptimal = True
-        else:
-            print(f"  [Error] 求解失败。Status: {status_str}")
-            return [], None, False
+    # ----------------------------
+    # Conjugate Gradient for X-update
+    # ----------------------------
+    @torch.no_grad()
+    def cg_solve(rhs_DT, rho, x0_DT=None, max_iter=60, tol=1e-5):
+        # Solve A(x)=rhs. x,r,p shapes (D,T)
+        x = rhs_DT.clone() if x0_DT is None else x0_DT.clone()
+        r = rhs_DT - A(x, rho)
+        p = r.clone()
+        rs_old = torch.sum(r * r)
+        if rs_old.item() < 1e-20:
+            return x
 
-    knot_count = pulp.value(prob.objective)
-    print(f"  -> 状态: {status_str}, 总 Knot 数: {int(knot_count)}")
+        for _ in range(max_iter):
+            Ap = A(p, rho)
+            denom = torch.sum(p * Ap) + 1e-12
+            alpha = rs_old / denom
+            x = x + alpha * p
+            r = r - alpha * Ap
+            rs_new = torch.sum(r * r)
+            if rs_new.item() <= tol * tol * (rhs_DT.numel()):
+                break
+            p = r + (rs_new / (rs_old + 1e-12)) * p
+            rs_old = rs_new
+        return x
 
-    # 提取激活的 knots
-    active_knots = [j for j in candidate_knots if pulp.value(y[j]) > 0.5]
-    # 确保是 int
-    active_knots = [int(k) for k in active_knots]
+    # ----------------------------
+    # ADMM solve for a given lambda
+    # ----------------------------
+    @torch.no_grad()
+    def solve_for_lambda(lam, rho=1.0, admm_iters=200, cg_iters=60):
+        # Variables:
+        # X: (D,T)
+        # Z,U: (D,T-4)
+        X = Y.clone()
+        Z = torch.zeros((D, T - 4), device=device, dtype=torch.float32)
+        U = torch.zeros((D, T - 4), device=device, dtype=torch.float32)
 
-    # 重建 MILP 的拟合曲线 (仅用于检查)
-    fitted_curves = np.zeros_like(data_6d)
-    for d in range(num_dims):
-        a_vals = [pulp.value(alpha[d][k]) for k in range(degree + 1)]
-        b_vals = {j: pulp.value(beta[d][j]) for j in candidate_knots}
-        for i, t_val in enumerate(time_points):
-            val = sum([a_vals[k] * (t_val**k) for k in range(degree + 1)])
-            for j in candidate_knots:
-                if t_val > j:
-                    val += b_vals[j] * ((t_val - j) ** degree)
-            fitted_curves[d, i] = val
+        forced_mask = torch.zeros((1, T - 4), device=device, dtype=torch.bool)
+        if forced_r:
+            rr = torch.tensor(sorted(list(forced_r)), device=device, dtype=torch.long)
+            forced_mask[:, rr] = True  # (1, T-4)
+
+        # ADMM loop
+        for it in range(admm_iters):
+            if (time.time() - start_time) > time_limit:
+                break
+
+            # X-update: (I + rho D4^T D4) X = Y + rho D4^T(Z - U)
+            rhs = Y + rho * d4T(Z - U)
+            X = cg_solve(rhs, rho=rho, x0_DT=X, max_iter=cg_iters, tol=1e-5)
+
+            # Z-update: group shrinkage on V = D4X + U across dims (group over D)
+            V = d4(X) + U  # (D, T-4)
+            norms = torch.sqrt(torch.sum(V * V, dim=0, keepdim=True) + 1e-12)  # (1, T-4)
+            shrink = torch.clamp(1.0 - (lam / (rho * norms)), min=0.0)  # (1, T-4)
+
+            # do NOT shrink forced positions
+            if forced_r:
+                shrink = torch.where(forced_mask, torch.ones_like(shrink), shrink)
+
+            Z = V * shrink  # broadcast over D
+
+            # U-update
+            U = U + d4(X) - Z
+
+            # small early stop (optional)
+            if (it + 1) % 25 == 0:
+                prim = torch.norm(d4(X) - Z) / (torch.norm(Z) + 1e-12)
+                if prim.item() < 1e-3:
+                    break
+
+        return X
+
+    # ----------------------------
+    # choose lambda by binary search to satisfy L∞ tolerance
+    # (largest lambda s.t. max_abs_error_per_dim <= eps)
+    # ----------------------------
+    @torch.no_grad()
+    def max_abs_err(X):
+        E = torch.abs(X - Y)  # (D,T)
+        return torch.max(E, dim=1).values  # (D,)
+
+    # quick bounds
+    lam_lo = 0.0
+    lam_hi = 1.0
+
+    # find upper bound where error exceeds eps
+    # (error increases with lambda; if not, keep increasing)
+    X_hi = solve_for_lambda(lam_hi, rho=1.0, admm_iters=120, cg_iters=40)
+    err_hi = max_abs_err(X_hi)
+
+    while torch.all(err_hi <= eps) and lam_hi < 1e6 and (time.time() - start_time) < time_limit * 0.5:
+        lam_hi *= 2.0
+        X_hi = solve_for_lambda(lam_hi, rho=1.0, admm_iters=120, cg_iters=40)
+        err_hi = max_abs_err(X_hi)
+
+    # If even huge lambda still fits tolerance, accept it (minimal knots)
+    if torch.all(err_hi <= eps):
+        X_best = X_hi
+        lam_best = lam_hi
+    else:
+        # binary search
+        X_best = None
+        lam_best = lam_lo
+        for _ in range(18):  # enough
+            if (time.time() - start_time) > time_limit:
+                break
+            lam_mid = 0.5 * (lam_lo + lam_hi)
+            X_mid = solve_for_lambda(lam_mid, rho=1.0, admm_iters=200, cg_iters=60)
+            err_mid = max_abs_err(X_mid)
+
+            if torch.all(err_mid <= eps):
+                lam_best = lam_mid
+                X_best = X_mid
+                lam_lo = lam_mid
+            else:
+                lam_hi = lam_mid
+
+        # if never feasible (very strict eps), fall back to lam=0
+        if X_best is None:
+            X_best = solve_for_lambda(0.0, rho=1.0, admm_iters=80, cg_iters=30)
+            lam_best = 0.0
+
+    # ----------------------------
+    # infer knots: Top-K (budget) instead of tiny threshold
+    # ----------------------------
+    with torch.no_grad():
+        D4 = d4(X_best)  # (D, T-4)
+        gn = torch.sqrt(torch.sum(D4 * D4, dim=0) + 1e-12)  # (T-4,)
+        gn_cpu = gn.detach().cpu().numpy()
+
+        # r -> knot time = r+2 in [2, T-3]
+        knot_times = np.arange(2, T - 2, dtype=int)  # length T-4
+
+        # ---- 你想要的“点数越少越好”在这里调 ----
+        MAX_KNOTS = 20            # 总 knot 上限（含 forced）
+        MIN_GAP = 1               # (可选) knot 之间最小间隔，=0 表示不限制
+
+        forced_times = sorted([k for k in forced_set if 1 <= k <= T - 2])
+        budget = max(0, MAX_KNOTS - len(forced_times))
+
+        # 给 forced 打无穷大分数，保证一定选中
+        scores = gn_cpu.copy()
+        for k in forced_times:
+            r = k - 2
+            if 0 <= r < len(scores):
+                scores[r] = 1e30
+
+        # 从大到小排序候选
+        order = np.argsort(-scores)
+
+        selected = []
+        chosen_times = set(forced_times)
+
+        def ok_with_gap(t):
+            if MIN_GAP <= 0:
+                return True
+            for tt in chosen_times:
+                if abs(t - tt) < MIN_GAP:
+                    return False
+            return True
+
+        # 先塞 forced
+        for t in forced_times:
+            selected.append(t)
+
+        # 再选 top-K（带最小间隔）
+        for idx in order:
+            t = int(knot_times[idx])
+            if t in chosen_times:
+                continue
+            if budget <= 0:
+                break
+            if ok_with_gap(t):
+                selected.append(t)
+                chosen_times.add(t)
+                budget -= 1
+
+        active_knots = sorted(set(selected))
+
+    fitted_curves = X_best.detach().cpu().numpy().astype(np.float32)
+
+    # not "suboptimal" in MILP sense; here mark suboptimal if time limit hit hard
+    is_suboptimal = (time.time() - start_time) > time_limit * 0.98
+
+    print(f"  [R1] lambda={lam_best:.4g} | knots={len(active_knots)} | "
+          f"max_err={torch.max(max_abs_err(X_best)).item():.6f} | device={device}")
 
     return active_knots, fitted_curves, is_suboptimal
+
+
 
 # ==========================================
 # 3. 数据加载与处理

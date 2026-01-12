@@ -17,6 +17,35 @@
     # 1524, 1535, 1550, 1553, 1560, 1562, 1565, 1570, 1574, 1577, 1602, 
     # 1610, 1615, 1616, 1617, 1622, 1630, 1646, 1653, 1659, 1660, 1662, 
     # 1667, 1669, 1671, 1672, 1677, 1680, 1682, 1685] # 仅仅需要处理的index
+
+#  "internal_knots": [
+        #   11,
+        #   19,
+        #   31,
+        #   45,
+        #   54,
+        #   64,
+        #   72,
+        #   84,
+        #   93,
+        #   113,
+        #   118,
+        #   121,
+        #   132,
+        #   146,
+        #   152,
+        #   163,
+        #   172,
+        #   188,
+        #   193,
+        #   209,
+        #   215,
+        #   229,
+        #   234,
+        #   246,
+        #   257,
+        #   265
+        # ],
 import numpy as np
 import pulp
 import matplotlib.pyplot as plt
@@ -145,121 +174,151 @@ def reconstruct_bspline_trajectory(control_points: np.ndarray, knot_vector: np.n
 # ==========================================
 # 2. 求解器 (核心修改部分)
 # ==========================================
-def solve_6d_with_forced_knots(time_points, data_6d, forced_knot_times, degree=3, tol_ratio=0.03, time_limit=600):
+def solve_6d_with_forced_knots(time_points, data_6d, forced_knot_times,
+                               degree=3, tol_ratio=0.03, time_limit=600):
+    """
+    B-spline(固定最大基) + Δ^4 稀疏(用y选择) + Gurobi Indicator 的MILP。
+    返回:
+      active_knots: 选择的时间knot (int list, 1..T-2)
+      fitted_curves: (6, T) 由该MILP在最大基下拟合出的曲线(用于你现有可视化)
+      is_suboptimal: 是否为次优/时间到解
+    """
+    try:
+        import gurobipy as gp
+        from gurobipy import GRB
+    except Exception as e:
+        raise ImportError("需要 gurobipy 才能使用该求解器版本。请确认已安装并有license。") from e
+
+    T = len(time_points)
     num_dims = data_6d.shape[0]
-    
-    # [Modify 1] 预处理强制Knots，确保为Set以便操作
-    forced_indices = set(int(t) for t in forced_knot_times)
-    
-    # [Modify 2] 生成基础候选集，并取并集
-    # 假设基础候选步长为1 (time_points[1:-1])
-    # 如果要降采样加速，可以改为 range(1, len(time_points)-1, 5) 等
-    base_indices = set(range(1, len(time_points) - 1))
-    
-    # 关键：强制 Knot 必须存在于候选列表中
-    candidate_indices_set = base_indices.union(forced_indices)
-    candidate_knots = sorted(list(candidate_indices_set))
+    assert degree == 3, "当前实现默认 cubic (degree=3)，若要其他degree需要同步改Δ阶数与基构造。"
 
-    prob = pulp.LpProblem("RobotArm_6D_Constrained", pulp.LpMinimize)
+    # 只允许内部knot: 1..T-2（与你原candidate一致）
+    candidates = list(range(1, T - 1))  # 1..T-2
+    forced_set = set(int(t) for t in forced_knot_times if 1 <= int(t) <= T - 2)
 
-    # 定义二值变量 y
-    y = pulp.LpVariable.dicts("y", candidate_knots, cat="Binary")
+    # ================
+    # 1) 构造最大 open-uniform knot vector U_max
+    # U = [0,0,0,0, 1,2,...,T-2, T-1,T-1,T-1,T-1]
+    # n_basis = len(U) - p - 1 = (T+6) - 3 - 1 = T+2
+    # ================
+    t0 = float(time_points[0])
+    t_end = float(time_points[-1])
+    internal = np.arange(1, T - 1, dtype=float)  # 1..T-2
+    U = np.concatenate([np.repeat(t0, degree + 1), internal, np.repeat(t_end, degree + 1)])
+    n_basis = len(U) - degree - 1  # T+2
 
-    # [Modify 3] 直接添加强制 Knot 约束 (Hard Constraint)
-    forced_count = 0
-    for f_idx in forced_indices:
-        # 由于上面取了并集，f_idx 一定在 candidate_knots 中
-        prob += y[f_idx] == 1
-        forced_count += 1
-    
-    print(f"  [Info] 已将 {forced_count} 个 Gripper 变化点锁定为强制 Knots (直接约束)")
+    # ================
+    # 2) 预计算 B-spline 设计矩阵 B (T x n_basis)
+    # 每行最多 4 个非零（cubic），后面用稀疏索引构线性表达式
+    # ================
+    from scipy.interpolate import BSpline
+    B = np.zeros((T, n_basis), dtype=float)
 
-    # 定义其他 MILP 变量
-    alpha = {}
-    beta = {}
-    BigMs = []
-    epsilons = []
+    # 构造每个基函数的单位控制点并评估
+    # （对T~几百/几千仍可接受；而且只做一次/episode）
+    eye = np.eye(n_basis, dtype=float)
+    for j in range(n_basis):
+        bj = BSpline(U, eye[j], degree, extrapolate=False)
+        B[:, j] = bj(time_points)
 
+    # 行稀疏索引（阈值过滤掉数值0）
+    row_nz = [np.where(B[i] > 1e-12)[0].tolist() for i in range(T)]
+
+    # ================
+    # 3) 建模
+    #   变量: c[d,j] 控制点(连续), y[k] 是否允许在k处有“拐点/跳变”(二进制), g[d,k]=Δ^4(c) (连续)
+    #   约束:
+    #     - y[k]=1 for forced
+    #     - g[d,k] = Δ^4 c 在控制点索引 i=k+3 处 (与k=1..T-2对齐)
+    #     - Indicator: y[k]==0 -> g[d,k]==0
+    #     - 拟合: | sum_j B[i,j]*c[d,j] - P | <= eps_d
+    #   目标: min sum_k y[k]
+    # ================
+    m = gp.Model("BSpline_Delta4_Sparse")
+    m.Params.OutputFlag = 1
+    m.Params.Threads = multiprocessing.cpu_count()
+    m.Params.TimeLimit = time_limit
+
+    # 控制点变量
+    c = m.addVars(num_dims, n_basis, lb=-GRB.INFINITY, name="c")
+
+    # y变量（只对内部knot时刻k）
+    y = m.addVars(candidates, vtype=GRB.BINARY, name="y")
+
+    # 强制knot
+    if forced_set:
+        for k in forced_set:
+            m.addConstr(y[k] == 1, name=f"force_y_{k}")
+    print(f"  [Info] 已将 {len(forced_set)} 个 Gripper 变化点锁定为强制 Knots (Indicator版本)")
+
+    # Δ^4 变量与约束：g[d,k] = c[d,i] -4c[d,i-1] +6c[d,i-2] -4c[d,i-3] + c[d,i-4]
+    # 这里 i = k+3，使得 k=1 -> i=4（用到c0..c4），k=T-2 -> i=T+1（合法，n_basis=T+2）
+    g = m.addVars(num_dims, candidates, lb=-GRB.INFINITY, name="g")
     for d in range(num_dims):
-        d_range = np.max(data_6d[d]) - np.min(data_6d[d])
+        for k in candidates:
+            i = k + 3
+            m.addConstr(
+                g[d, k] ==
+                c[d, i] - 4.0 * c[d, i - 1] + 6.0 * c[d, i - 2] - 4.0 * c[d, i - 3] + c[d, i - 4],
+                name=f"delta4_{d}_{k}"
+            )
+            # Indicator: y[k]==0 -> g[d,k]==0
+            m.addGenConstrIndicator(y[k], 0, g[d, k], GRB.EQUAL, 0.0, name=f"ind_{d}_{k}")
+
+    # 拟合误差约束
+    epsilons = []
+    for d in range(num_dims):
+        d_range = float(np.max(data_6d[d]) - np.min(data_6d[d]))
         if d_range < 1e-6:
             d_range = 1.0
-
-        eps = d_range * tol_ratio
+        eps = d_range * float(tol_ratio)
         epsilons.append(eps)
-        BigMs.append(d_range * 1) # NOTE M=1
-        
-        alpha[d] = pulp.LpVariable.dicts(f"alpha_{d}", range(degree + 1), lowBound=None)
-        beta[d] = pulp.LpVariable.dicts(f"beta_{d}", candidate_knots, lowBound=None)
 
-    # 目标函数：最小化 Knot 总数
-    total_knots = pulp.lpSum([y[j] for j in candidate_knots])
-    prob += total_knots
-    # prob += total_knots >= max(5, forced_count) # 下界至少是强制点的数量
-    # prob += total_knots <= 70
+        for i in range(T):
+            P = float(data_6d[d][i])
+            idxs = row_nz[i]  # 至多4个
+            expr = gp.quicksum(float(B[i, j]) * c[d, j] for j in idxs)
+            m.addConstr(expr - P <= eps, name=f"fit_pos_{d}_{i}")
+            m.addConstr(P - expr <= eps, name=f"fit_neg_{d}_{i}")
 
-    # 拟合约束
-    for d in range(num_dims):
-        M_d = BigMs[d]
-        eps_d = epsilons[d]
+    # 目标：最小化选择的knot数
+    m.setObjective(gp.quicksum(y[k] for k in candidates), GRB.MINIMIZE)
 
-        for j in candidate_knots:
-            prob += beta[d][j] <= M_d * y[j]
-            prob += beta[d][j] >= -M_d * y[j]
+    print(f"正在求解 6D 轨迹... Tol: {tol_ratio*100}% | Solver: Gurobi (Indicator) | T={T} | n_basis={n_basis}")
+    m.optimize()
 
-        # 采样点约束 (为了加速，可以适当对 time_points 降采样进行约束检查，这里保持全量)
-        for i, t_val in enumerate(time_points):
-            P_val = data_6d[d][i]
-            
-            # 多项式部分
-            poly_part = pulp.lpSum([alpha[d][k] * (t_val**k) for k in range(degree + 1)])
-            
-            # Knot 修正部分
-            # 注意：只对 t_val > j 的项求和
-            knot_terms = [beta[d][j] * ((t_val - j) ** degree) for j in candidate_knots if t_val > j]
-            
-            S_t = poly_part + pulp.lpSum(knot_terms)
-            prob += S_t - P_val <= eps_d
-            prob += P_val - S_t <= eps_d
-
-    cpu_cores = multiprocessing.cpu_count()
-    print(f"正在求解 6D 轨迹... Tol: {tol_ratio*100}% | Solver: CBC ({cpu_cores} core)")
-    
-    solver = pulp.PULP_CBC_CMD(msg=True, threads=cpu_cores, timeLimit=time_limit)
-    # solver = pulp.GUROBI(msg=True, threads=cpu_cores, timeLimit=time_limit)
-    prob.solve(solver)
-
-    status_str = pulp.LpStatus[prob.status]
-    objective_val = pulp.value(prob.objective)
+    # ================
+    # 4) 读取结果
+    # ================
     is_suboptimal = False
+    if m.Status == GRB.OPTIMAL:
+        status_str = "Optimal"
+    elif m.Status in (GRB.TIME_LIMIT, GRB.SUBOPTIMAL):
+        status_str = "Suboptimal/TimeLimit"
+        is_suboptimal = True
+    elif m.Status in (GRB.INFEASIBLE, GRB.INF_OR_UNBD):
+        print(f"  [Error] 不可行/无界。Status={m.Status}")
+        return [], None, False
+    else:
+        print(f"  [Error] 求解失败。Status={m.Status}")
+        return [], None, False
 
-    if status_str != "Optimal":
-        if objective_val is not None:
-            print(f"  [Info] 次优解 (Knots: {int(objective_val)}) | Status: {status_str}")
-            is_suboptimal = True
-        else:
-            print(f"  [Error] 求解失败。Status: {status_str}")
-            return [], None, False
+    obj_val = m.ObjVal if m.SolCount > 0 else None
+    if obj_val is None:
+        print(f"  [Error] 没有可用解。Status={m.Status}")
+        return [], None, False
 
-    knot_count = pulp.value(prob.objective)
-    print(f"  -> 状态: {status_str}, 总 Knot 数: {int(knot_count)}")
+    print(f"  -> 状态: {status_str}, 总 Knot 数: {int(round(obj_val))}")
 
-    # 提取激活的 knots
-    active_knots = [j for j in candidate_knots if pulp.value(y[j]) > 0.5]
-    # 确保是 int
-    active_knots = [int(k) for k in active_knots]
+    active_knots = [int(k) for k in candidates if y[k].X > 0.5]
 
-    # 重建 MILP 的拟合曲线 (仅用于检查)
-    fitted_curves = np.zeros_like(data_6d)
+    # 用最大基下的控制点重建 fitted_curves（用于你现有可视化/对比）
+    fitted_curves = np.zeros_like(data_6d, dtype=float)
+    # 取出每个维度的控制点向量
     for d in range(num_dims):
-        a_vals = [pulp.value(alpha[d][k]) for k in range(degree + 1)]
-        b_vals = {j: pulp.value(beta[d][j]) for j in candidate_knots}
-        for i, t_val in enumerate(time_points):
-            val = sum([a_vals[k] * (t_val**k) for k in range(degree + 1)])
-            for j in candidate_knots:
-                if t_val > j:
-                    val += b_vals[j] * ((t_val - j) ** degree)
-            fitted_curves[d, i] = val
+        cvec = np.array([c[d, j].X for j in range(n_basis)], dtype=float)
+        fitted_curves[d] = B @ cvec
 
     return active_knots, fitted_curves, is_suboptimal
 
