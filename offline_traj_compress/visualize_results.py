@@ -11,9 +11,8 @@ from typing import Dict, Tuple, List
 RESULTS_JSON_PATH = Path("compression_results.json")
 VISUAL_OUTPUT_DIR = Path("visual_fig_analysis")
 DATASET_ROOT = Path("/inspire/hdd/project/robot-decision/public/datasets/") / "HuggingFaceVLA/libero"
-COMPRESSION_FAIL_PATH = Path("compression_fail.json")
 MAX_ERROR_THRESHOLD = 0.1
-EPISODE_ID = 1301
+EPISODE_ID = 35
 
 # ==========================================
 # 加载数据集
@@ -332,19 +331,6 @@ def main():
             print(f"  ✗ 处理失败: {e}")
             import traceback
             traceback.print_exc()
-    
-    # 保存失败的 episode 列表
-    if failed_episodes:
-        print(f"\n发现 {len(failed_episodes)} 个压缩失败的 episode，保存到 {COMPRESSION_FAIL_PATH}")
-        with open(COMPRESSION_FAIL_PATH, 'w') as f:
-            json.dump({
-                "threshold": MAX_ERROR_THRESHOLD,
-                "failed_count": len(failed_episodes),
-                "episodes": failed_episodes
-            }, f, indent=2)
-        print(f"✓ 失败列表已保存")
-    else:
-        print("\n✓ 所有 episode 压缩成功！")
     
     print("\n" + "=" * 80)
     print(f"所有可视化已保存到: {VISUAL_OUTPUT_DIR}")

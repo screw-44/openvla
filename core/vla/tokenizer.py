@@ -11,22 +11,19 @@ from torchvision import transforms
 from transformers import PreTrainedTokenizerBase
 
 from core.models.backbones.vision.base_vision import ImageTransform
-from core.models.backbones.llm.prompting.base_prompter import PromptBuilder
+from core.models.backbones.llm.prompting import PromptBuilder
 from core.models.vlms.prismatic import IGNORE_INDEX
 from core.util.overwatch import initialize_overwatch
 
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
 
-
 TRAJECTORY_CONVERTER_REGISTRY = {}
-
 
 def register_trajectory_converter(name: str):
     def decorator(cls):
         TRAJECTORY_CONVERTER_REGISTRY[name] = cls
         return cls
-
     return decorator
 
 
@@ -162,7 +159,79 @@ class AbsAffBsplineTextualizeTC(BaseTrajectoryConverter):
         trajectory = np.concatenate([bspline, clamp_value[:, None], knot[:, None]], axis=1)
         return trajectory
         
+@register_trajectory_converter("bspline_v3")
+class BsplineTrajConverterV3(BaseTrajectoryConverter):
+    """用分位数量化B样条控制点，映射到vocab_size-512~vocab_size-256的token（避免与EOS token 50256冲突）"""
 
+    def __init__(self, tokenizer: PreTrainedTokenizerBase):
+        self.tokenizer = tokenizer
+        self.n_bins, self.n_dims = 512, 8  # 512, 7+knot
+        self.action_token_start = self.tokenizer.vocab_size - self.n_bins - 256  # 动作token起始位置
+        
+        # 加载分位数 edges (shape: 6, n_bins+1)
+        edges_path =  Path(__file__).parent.parent.parent / "assets" / "control_point_bin_distribution.npy"
+        self.edges = np.load(edges_path)  
+        assert self.edges.shape == (6, self.n_bins + 1), f"edges shape error: {self.edges.shape}"
+        # 计算每个维度的 bin center
+        self.bin_centers = np.array([
+            (self.edges[d, :-1] + self.edges[d, 1:]) / 2.0 for d in range(6)
+        ])
+        overwatch.info(f"✓ Loaded quantile edges from {edges_path}")
+
+    def encode_trajectory_to_token_ids(self, trajectory: np.ndarray) -> np.ndarray:
+        print("input trajectory shape:", trajectory.shape)
+        bspline_trajectory, gripper_trajectory, knot_trajectory = trajectory[:, :6], trajectory[:, 6], trajectory[:, 7]
+        
+        # 编码 bspline: 用 searchsorted 找到分位数 bin 索引
+        bspline_traj_token_ids = np.zeros_like(bspline_trajectory, dtype=int)
+        for d in range(6):
+            bin_idx = np.searchsorted(self.edges[d], bspline_trajectory[:, d], side='right') - 1
+            bin_idx = np.clip(bin_idx, 0, self.n_bins - 1)
+            bspline_traj_token_ids[:, d] = self.action_token_start + bin_idx
+
+        # 编码 gripper
+        gripper_traj_token_ids = self.action_token_start + (gripper_trajectory + 1) * (self.n_bins - 1) // 2
+
+        # 编码 knot
+        knot_trajectory_token_ids = self.action_token_start + knot_trajectory
+        
+        # 拼接所有 token
+        traj_token_ids = np.concatenate([
+            bspline_traj_token_ids, 
+            gripper_traj_token_ids.reshape(-1, 1), 
+            knot_trajectory_token_ids.reshape(-1, 1)
+        ], axis=1).flatten().astype(int)
+
+        print("traj_token_ids:", traj_token_ids)
+
+        return traj_token_ids
+
+    def decode_text_ids_to_trajectory(self, text_ids: np.ndarray) -> np.ndarray:
+        # 移除EOS token
+        text_ids = text_ids[:-1]
+        n = text_ids.shape[0] // 8
+        # 还原为 (n, 8)
+        tokens = text_ids.reshape(n, 8)
+        
+        # 还原 bspline: 用 bin center 来近似
+        bspline_token_ids = tokens[:, :6]
+        bspline = np.zeros((n, 6), dtype=np.float32)
+        for d in range(6):
+            bin_idx = np.clip(bspline_token_ids[:, d] - self.action_token_start, 0, self.n_bins - 1)
+            bspline[:, d] = self.bin_centers[d, bin_idx]
+        
+        # 还原 gripper
+        gripper_token_ids = tokens[:, 6]
+        gripper_value = (gripper_token_ids - self.action_token_start) * 2 / (self.n_bins - 1) - 1
+        
+        # 还原 knot
+        knot_token_ids = tokens[:, 7]
+        knot = knot_token_ids - self.action_token_start
+        
+        # 拼回 (n, 8)
+        trajectory = np.concatenate([bspline, gripper_value[:, None], knot[:, None]], axis=1)
+        return trajectory
+        
 
 # 使用dataclass方便管理参数
 @dataclass

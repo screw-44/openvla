@@ -23,13 +23,9 @@ def get_vla_tokenizer(
     prompt_builder_fn: Type[PromptBuilder],
     # Trajectory converter configuration (with defaults)
     trajectory_converter_type: str = "value_textualize",
-    trajectory_n_bins: int = 256,
-    trajectory_n_dims: int = 7,
 ):
     trajectory_converter = TRAJECTORY_CONVERTER_REGISTRY[trajectory_converter_type](
-        tokenizer=base_tokenizer,
-        n_bins=trajectory_n_bins,
-        n_dims=trajectory_n_dims,
+        tokenizer=base_tokenizer
     )
 
     vla_tokenizer = VlaTokenizer(
@@ -56,8 +52,6 @@ def get_vla_dataset(
     image_transform: ImageTransform,
     # Trajectory converter configuration (with defaults)
     trajectory_converter_type: str = "value_textualize",
-    trajectory_n_bins: int = 256,
-    trajectory_n_dims: int = 7,
 ) -> Tuple[MyLeRobotDataset, BaseTrajectoryConverter, PaddedCollatorForActionPrediction]:
 
     trajectory_converter, vla_tokenizer, trajectory_compressor = get_vla_tokenizer(
@@ -65,8 +59,6 @@ def get_vla_dataset(
         base_tokenizer=base_tokenizer,
         prompt_builder_fn=prompt_builder_fn,
         trajectory_converter_type=trajectory_converter_type,
-        trajectory_n_bins=trajectory_n_bins,
-        trajectory_n_dims=trajectory_n_dims,
     )
 
     dataset = MyLeRobotDataset(
