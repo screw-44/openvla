@@ -69,12 +69,10 @@ def create_trajectory_converter(vla_cfg, tokenizer):
     """Create trajectory converter from VLA config."""
     # Handle both OmegaConf and regular config
     converter_type = vla_cfg.get('trajectory', {}).get('converter_type')
-    converter_n_bins = vla_cfg.get('trajectory', {}).get('n_bins')
-    converter_n_dims = vla_cfg.get('trajectory', {}).get('n_dims')
+
 
     overwatch.info(
         f"Creating Trajectory Converter [bold]{converter_type}[/] "
-        f"(n_bins={converter_n_bins}, n_dims={converter_n_dims})"
     )
 
     if converter_type not in TRAJECTORY_CONVERTER_REGISTRY:
@@ -83,11 +81,7 @@ def create_trajectory_converter(vla_cfg, tokenizer):
             f"Available: {list(TRAJECTORY_CONVERTER_REGISTRY.keys())}"
         )
 
-    return TRAJECTORY_CONVERTER_REGISTRY[converter_type](
-        tokenizer=tokenizer,
-        n_bins=converter_n_bins,
-        n_dims=converter_n_dims,
-    )
+    return TRAJECTORY_CONVERTER_REGISTRY[converter_type](tokenizer=tokenizer)
 
 
 

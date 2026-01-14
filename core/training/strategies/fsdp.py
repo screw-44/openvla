@@ -281,10 +281,7 @@ class FSDPStrategy(RunStrategy):
         # Create Optimizer and LR Scheduler =>> note that most of the LR Schedulers we use require `max_steps/epochs`
         #   => Optimizer should only operate on parameters that are *unfrozen* / trainable!
         n_train_examples = math.ceil(n_train_examples / self.global_batch_size) * self.global_batch_size
-        if self.max_steps is None:
-            num_training_steps = (n_train_examples * self.epochs) // self.global_batch_size
-        else:
-            num_training_steps = self.max_steps
+        num_training_steps = (n_train_examples * self.epochs) // self.global_batch_size
 
         if self.lr_scheduler_type == "linear-warmup+cosine-decay":
             # Set warmup steps (floor) based on `warmup_ratio` (should be 0.03 - 0.05)

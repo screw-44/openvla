@@ -6,7 +6,8 @@ dataset/
 *.jpg
 scripts/eval_results/*
 core/vla/outputs/*
-
+offline_traj_compress/results_v2_partial/*
+*.mp4
 
 
 # Byte-compiled / optimized / DLL files

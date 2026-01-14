@@ -15,6 +15,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 import json
+import copy
 
 TRAJECTORY_COMPRESSION_REGISTRY = {}
 
@@ -212,11 +213,14 @@ class BSplineTrajectoryCompressionV3(BaseTrajectoryCompression):
         self.exp_type = "v3" # 代码设置不兼容了，这个不重要了
         self.degree = 3
 
-        compression_json = Path(__file__).parent.parent.parent / "assets" / "compression_results_processed.json"
+        compression_json = Path(__file__).parent.parent.parent / "assets" / "compression_results_v2.json"
         with open(compression_json, "r") as f:
             offline_compression_results = json.load(f)
         
         self.episode_cache = offline_compression_results["episodes"]  # 存储每个episode的B样条数据
+        print("self.episode_cache keys:", list(self.episode_cache.keys())[:10])
+
+        self._cache_smoothed_trajectoy = None
 
     # cp代表compression points
     def get_cp_from_episode(self, episode_index: int):
@@ -224,10 +228,15 @@ class BSplineTrajectoryCompressionV3(BaseTrajectoryCompression):
         if episode_index not in self.episode_cache.keys():
             raise ValueError(f"Episode index {episode_index} not found in compression results.")
         
-        episode_data = self.episode_cache[episode_index]
+        episode_data = copy.deepcopy(self.episode_cache[episode_index]) # 同一个episode可能会被多次调用，深拷贝避免修改原数据
         bspline_data = episode_data["bspline"]
-        control_points = np.array(bspline_data["control_points"])
-        knot_vector = np.array(bspline_data["knot_vector"]) # 取第一个维度的knot vector
+        control_points = bspline_data["control_points"]
+        # gripper这个dim进行补全
+        control_points[-1].extend([-1,] * self.degree) # NOTE：补全 -1 (注意为占位符号)
+        # print("control_points:", control_points)
+        # print("controlpoints shape of row 0, and row -1:", len(control_points[0]), " ", len(control_points[-1]))
+        control_points = np.array(control_points)
+        knot_vector = np.array(bspline_data["knots_vector"]) 
         return control_points, knot_vector
 
     def compress_to_control_point(self):
@@ -254,111 +263,72 @@ class BSplineTrajectoryCompressionV3(BaseTrajectoryCompression):
         # print("predict values:", predict_values)
         return predict_values
     
-    # 为了服务decode_to_action, 还需要添加start_reanchor_expoential()方法, 起步的时候消除静态误差， decay_sigma控制指数衰减的快慢(时间)
-    def start_reanchor_expoential(self, pred_points, current_eef_points, decay_sigma=0.5, degree=3):
-        # 0. 重新组合成控制点和knot vector
+    # 从0到10的平滑过渡到曲线上
+    def start_offset(self, current_eef_pos, target_pred_pos, decay_distance=10):
+        delta = current_eef_pos[:6] - target_pred_pos[:6]
+        t = np.arange(decay_distance)
+        
+        # 使用余弦函数生成 1 -> 0 的平滑曲线
+        # cos(0) = 1, cos(pi) = -1
+        # 变换公式: 0.5 * (1 + cos(pi * t / decay_distance))
+        weights = 0.5 * (1 + np.cos(np.pi * t / decay_distance))
+        
+        correction_segment = np.outer(weights, delta)
+        return correction_segment
+
+
+    def decode_to_action(self, pred_points: np.ndarray) -> Tuple:
+        """从控制点解码回aff_trajectory。 x, y, z, yaw, pitch, roll, ---,  knot_vector"""
+        # assert pred_points.shape[0] >= self.degree + 1, "控制点数量不足degree + 1，无法解码轨迹。"
+
         control_points = pred_points[:, :6]  # 只处理前六维的x, y, z, yaw, pitch, roll
         knot_vector = pred_points[:, -1]  # 最后一个dim的knot vector
         knot_vector = np.concatenate([
-            np.repeat(knot_vector[0], degree),
+            np.repeat(knot_vector[0], self.degree),
             knot_vector,
             np.repeat(knot_vector[-1], 1)
         ])
 
-        # 1. 计算 t=0 处的预测位置和误差
-        temp_spline = BSpline(knot_vector, control_points, k=degree)
-        pred_start = temp_spline(0.0)
-        current_eef_pose = current_eef_points[:6] # 只取前六维
-        delta = current_eef_pose - pred_start # 误差向量
-        
-        # 2. 找到 t=0 时刻相关的控制点索引
-        # 在 B-spline 中，t=0 受 index 为 [idx_0 - degree] 到 [idx_0] 的控制点影响
-        # searchsorted 找到 0 应该插入的位置，减 1 就是最后那个影响 t=0 的 knot 的索引
-        # 注意：B-spline 定义域通常是 [knots[degree], knots[-degree-1]]
-        
-        # 我们不仅要平移 t=0，还要平移 t<0 的历史，所以我们要找到所有影响 t<=0 的控制点
-        # 简单做法：找到 t=0 所在的 knot span 对应的最后一个控制点索引
-        span_idx = np.searchsorted(knot_vector, 0.0, side='right') - 1
-        
-        # 3. 构建局部掩码 (Local Mask)
-        N_cp = len(control_points)
-        mask = np.zeros(N_cp)
-        
-        # --- A. 历史锁定区 (t <= 0) ---
-        # 影响 t=0 及其之前的所有控制点，权重必须是 1
-        # 这样保证 t=0 处的 位置+速度+加速度 整体平移，没有顿挫
-        # 对于 p=3, 影响 t=0 的控制点是 span_idx, span_idx-1, span_idx-2, span_idx-3
-        history_end_idx = span_idx 
-        mask[:history_end_idx + 1] = 1.0 
-        
-        # --- B. 指数衰减区 (t > 0) ---
-        # 从 history_end_idx 后面开始衰减
-        # 我们需要知道每个控制点大致对应的时间，才能做指数衰减
-        # Greville Abscissae (格雷维尔坐标) 是估算控制点对应时间的标准方法
-        # t_i = sum(knots[i+1 : i+p+1]) / p
-        
-        for i in range(history_end_idx + 1, N_cp):
-            # 计算该控制点对应的“物理时间”
-            # 取该控制点支撑区间的 knot 平均值
-            knot_sub = knot_vector[i+1 : i+degree+1]
-            if len(knot_sub) == 0: break # 边界保护
-            t_approx = np.mean(knot_sub)
-            
-            # 如果这个控制点的时间已经很大了，说明是后续操作，不用改
-            if t_approx > 0:
-                # 指数衰减公式: w = exp(-t / sigma)
-                # t越大，w越接近0
-                w = np.exp(-t_approx / decay_sigma)
-                
-                # 截断：如果权重已经很小了，直接置0，保证绝对安全
-                if w < 0.01:
-                    w = 0.0
-                
-                mask[i] = w
-            else:
-                # 理论上 t_approx > 0 的分支应该覆盖后面，这里以防万一
-                mask[i] = 1.0
+        # print("knot_vector after extend:", knot_vector)
+        bspline = BSpline(knot_vector, control_points, k=self.degree)
 
-        # 4. 应用修正
-        # correction: (N, 1) * (1, Dim) = (N, Dim)
-        correction = mask[:, np.newaxis] * delta[np.newaxis, :]
-        new_control_points = control_points + correction
+        # print("control points shape:", control_points.shape)
+        # print("control points:", control_points)
 
-        bpsline = BSpline(knot_vector, new_control_points, k=degree)
-        return bpsline, knot_vector
+        # NOTE: gripper的bspline是0阶的step function, 注意padding的处理
+        gripper_bspline = BSpline(knot_vector[self.degree:-self.degree], pred_points[:, 6][:-self.degree], k=0)
 
-    def decode_to_action(
-        self, control_points: np.ndarray, current_eef_pose: np.ndarray
-    ) -> Tuple:
-        """从控制点解码回aff_trajectory。 不管用A还是S，都是当前pose到预测的这些点上去移动，设置移动的速度。"""
-        assert control_points.shape[0] >= 3, "控制点数量不足degree + 1，无法解码轨迹。"
-        # x, y, z, yaw, pitch, roll, ---,  knot_vector
-        bspline, knot_vector = self.start_reanchor_expoential(control_points, current_eef_pose)
+        return bspline, gripper_bspline
 
-        # 2. 解码 Gripper 轨迹 (0阶/Step Function)
-        # internal_knot_vector 已经是相对时间了 (例如: -3, -2, -1, 0, 5, 10...)
-        internal_knot_vector = control_points[:, -1]
-        gripper_cp = control_points[:, 6]
-        # print("internal_knot_vector:", internal_knot_vector)
-        print("knots for gripper:", knot_vector)
-        print("gripper cp:", gripper_cp)
+
+    def smooth_traj(
+            self, pred_trajectory: np.ndarray, pred_gap: int, smooth_ratio: float = 1, reset: bool = False,
+        ):
+        """
+            笛卡尔空间轨迹平滑
+
+            传入参数：
+            - pred_trajectory 是当前预测的控制点序列，从0时刻开始(笛卡尔空间）。
+            - pred_gap：两次预测之间的时间间隔（帧数）。
+            - smooth_ratio: 控制平滑的比例因子，范围在0到1之间。实际平滑的数量是 1 / smooth_ratio下的数据做平滑。
+            - 是否reset：如果为True，表示重新开始平滑处理，一般在新episode开始时使用。
+        """
+        if self._cache_smoothed_trajectoy is None or reset:
+            self._cache_smoothed_trajectoy = pred_trajectory
+            return self._cache_smoothed_trajectoy
         
-        # 确定评估时间点：从 0 (当前) 开始，直到轨迹结束
-        # 向上取整以覆盖最后的时间段
-        max_time = np.ceil(knot_vector[-1])
-        t_eval = np.arange(0, int(max_time) + 1)
+        if smooth_ratio == 1:
+            self._cache_smoothed_trajectoy = pred_trajectory
+            return self._cache_smoothed_trajectoy
 
-        gripper_cp = control_points[:, 6]
-        knot_span_indices = np.searchsorted(knot_vector, t_eval, side='right')
-        gripper_indices = knot_span_indices - (self.degree - 1)
-        
-        # 边界保护：防止 t_eval 比第一个 knot 还小 (变成 -1) 或 比最后一个还大
-        # 对于 t < 第一个knot，通常保持第一个状态
-        gripper_indices = np.clip(gripper_indices, 0, len(gripper_cp) - 1)
-        print("gripper indices:", gripper_indices)
-        
-        gripper_traj = gripper_cp[gripper_indices]
-        return bspline, gripper_traj
+        cached_traj = self._cache_smoothed_trajectoy[pred_gap:] # 去掉已经执行过的部分
 
-    # TODO：在decode_to_action之后， 还需要在笛卡尔空间进行平滑
+        shared_length = min(len(pred_trajectory), len(cached_traj))
+        print("shared_length for smoothing:", shared_length, ". pred_trajectory length:", len(pred_trajectory), 
+              ", cached_traj length:", len(cached_traj))
 
+        pred_trajectory[:shared_length] = (
+            smooth_ratio * pred_trajectory[:shared_length] + (1 - smooth_ratio) * cached_traj[:shared_length] 
+        ) 
+        self._cache_smoothed_trajectoy = pred_trajectory
+        return self._cache_smoothed_trajectoy

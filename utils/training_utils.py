@@ -5,7 +5,7 @@ import torch.distributed as dist
 from pathlib import Path
 from typing import Optional, Tuple
 
-from core.overwatch.overwatch import initialize_overwatch
+from core.util.overwatch import initialize_overwatch
 overwatch = initialize_overwatch(__name__)
 
 def warmup_trainig() -> int:

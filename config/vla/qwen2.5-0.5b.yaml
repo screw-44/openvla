@@ -9,7 +9,7 @@ vlm:
   llm_backbone_id: qwen2.5-0.5b-instruct
   vision_backbone_id: siglip-vit-b16-224px
 
-freeze_vision_backbone: true
+freeze_vision_backbone: false
 freeze_llm_backbone: false
 unfreeze_last_llm_layer: false
 

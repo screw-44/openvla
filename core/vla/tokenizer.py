@@ -179,7 +179,7 @@ class BsplineTrajConverterV3(BaseTrajectoryConverter):
         overwatch.info(f"✓ Loaded quantile edges from {edges_path}")
 
     def encode_trajectory_to_token_ids(self, trajectory: np.ndarray) -> np.ndarray:
-        print("input trajectory shape:", trajectory.shape)
+        # print("input trajectory shape:", trajectory.shape)
         bspline_trajectory, gripper_trajectory, knot_trajectory = trajectory[:, :6], trajectory[:, 6], trajectory[:, 7]
         
         # 编码 bspline: 用 searchsorted 找到分位数 bin 索引
@@ -202,7 +202,7 @@ class BsplineTrajConverterV3(BaseTrajectoryConverter):
             knot_trajectory_token_ids.reshape(-1, 1)
         ], axis=1).flatten().astype(int)
 
-        print("traj_token_ids:", traj_token_ids)
+        # print("traj_token_ids:", traj_token_ids)
 
         return traj_token_ids
 
@@ -210,6 +210,7 @@ class BsplineTrajConverterV3(BaseTrajectoryConverter):
         # 移除EOS token
         text_ids = text_ids[:-1]
         n = text_ids.shape[0] // 8
+
         # 还原为 (n, 8)
         tokens = text_ids.reshape(n, 8)
         
@@ -253,9 +254,13 @@ class VlaTokenizer:
         lang = batch["language"].lower().strip()
         prompt_builder = self.prompt_builder_fn("openvla")
 
+        state = batch["state"].tolist()
+        precision = 4
+        state = "[" + ", ".join([f"{x:.{precision}f}" for x in state]) + "]"
+
         # Step1: 添加human turn，获取prompt（含"In: ...\nOut: "但不含action）
         prompt_builder.add_turn(
-            "human", f"What action should the robot take to {lang}?"
+            "human", f"What action should the robot take to {lang}, robot state: {state}?"
         )
         prompt = prompt_builder.get_prompt()  # 注意gpt2默认不添加eos tokens
         prompt_ids = self.base_tokenizer(prompt)["input_ids"]
@@ -276,6 +281,7 @@ class VlaTokenizer:
             [inputs["prompt_ids"], action_tokens, [self.base_tokenizer.eos_token_id]]
         )
 
+        # pick up the black bowl between the plate and the ramekin and place it on the plate
         # Step6: 只保留action部分的labels，其余设为IGNORE_INDEX
         labels = input_ids.copy()
         prompt_ids_length = len(inputs["prompt_ids"])

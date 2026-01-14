@@ -146,8 +146,6 @@ def train(cfg: DictConfig) -> None:
         data_task_ids=dataset_cfg.get_task_ids() if hasattr(dataset_cfg, 'get_task_ids') else None,
         trajectory_compression_method=vla_cfg.trajectory.compression_method,
         trajectory_converter_type=vla_cfg.trajectory.converter_type,
-        trajectory_n_bins=vla_cfg.trajectory.n_bins,
-        trajectory_n_dims=vla_cfg.trajectory.n_dims,
         base_tokenizer=vla.llm_backbone.get_tokenizer(),
         prompt_builder_fn=vla.llm_backbone.prompt_builder_fn,
         image_transform=vla.vision_backbone.get_image_transform(),

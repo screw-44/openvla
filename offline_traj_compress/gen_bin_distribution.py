@@ -137,7 +137,7 @@ def generate_control_point_bin_distribution(
 
 
 if __name__ == "__main__":
-    asset_json = Path(__file__).parent.parent / "assets" / "compression_results.json"
+    asset_json = Path(__file__).parent.parent / "assets" / "compression_results_v2.json"
     output_npy = Path(__file__).parent / "control_point_bin_distribution.npy"
     
     print(f"📁 JSON 路径: {asset_json}")
