@@ -81,8 +81,6 @@ def train(cfg: DictConfig) -> None:
             "type": "vla",
             "trajectory_compression": vla_cfg.trajectory.compression_method,
             "trajectory_converter_type": vla_cfg.trajectory.converter_type,
-            "trajectory_n_bins": vla_cfg.trajectory.n_bins,
-            "trajectory_n_dims": vla_cfg.trajectory.n_dims,
             "action_dim": vla_cfg.get("action_dim", 7),
             "action_horizon": vla_cfg.get("action_horizon", 1),
             "observation_horizon": vla_cfg.get("observation_horizon", 1),

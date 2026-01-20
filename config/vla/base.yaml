@@ -7,7 +7,7 @@ vlm:
   llm_backbone_id: distilgpt2
   arch_specifier: gelu-mlp
   image_resize_strategy: letterbox
-  llm_max_length: 4096
+  llm_max_length: 8192
 
 freeze_vision_backbone: true
 freeze_llm_backbone: false
@@ -19,7 +19,7 @@ optimization:
   learning_rate: 5.0e-4
   weight_decay: 0.001
   max_grad_norm: 2.0
-  lr_scheduler_type: linear-warmup+cosine-decay
+  lr_scheduler_type: constant # linear-warmup+cosine-decay
   warmup_ratio: 0.01
   train_strategy: fsdp-full-shard
   enable_gradient_checkpointing: true
@@ -29,8 +29,6 @@ optimization:
 trajectory:
   compression_method: action_chunk
   converter_type: value_textualize
-  n_bins: 256
-  n_dims: 7
 
 action_dim: 7
 action_horizon: 1

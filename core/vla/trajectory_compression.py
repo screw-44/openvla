@@ -218,7 +218,7 @@ class BSplineTrajectoryCompressionV3(BaseTrajectoryCompression):
             offline_compression_results = json.load(f)
         
         self.episode_cache = offline_compression_results["episodes"]  # 存储每个episode的B样条数据
-        print("self.episode_cache keys:", list(self.episode_cache.keys())[:10])
+        # print("self.episode_cache keys:", list(self.episode_cache.keys())[:10])
 
         self._cache_smoothed_trajectoy = None
 
@@ -256,6 +256,8 @@ class BSplineTrajectoryCompressionV3(BaseTrajectoryCompression):
         idx = np.searchsorted(full_traj[:,-1], frame_index)
         # NOTE: 我们设定需要拿到-3的点开始预测, 维持i后的轨迹一致
         slice_idx = max(0, idx - 3)
+        # TODO: 强制设定从0开始，每次预测完整的轨迹
+        slice_idx = 0
 
         predict_values = full_traj[slice_idx:, :]
         # NOTE: 对于如果前面的 - frame_index 变成负数的情况，需要进行调整

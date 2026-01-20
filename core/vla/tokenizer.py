@@ -249,21 +249,26 @@ class VlaTokenizer:
     base_tokenizer: PreTrainedTokenizerBase  # huggingface Transformers的tokenizer类。会将文本分词/编码到id/添加特殊token
     prompt_builder_fn: Type[PromptBuilder]
 
-    def tokenize_input(self, batch: Dict[str, Any]) -> dict:
+    def tokenize_prompt(self, task_description: str, state: np.ndarray) -> str:
         # 定义vla的conversation prompt
-        lang = batch["language"].lower().strip()
         prompt_builder = self.prompt_builder_fn("openvla")
 
-        state = batch["state"].tolist()
         precision = 4
-        state = "[" + ", ".join([f"{x:.{precision}f}" for x in state]) + "]"
+        state_str = "[" + ", ".join([f"{x:.{precision}f}" for x in state.tolist()]) + "]"
 
         # Step1: 添加human turn，获取prompt（含"In: ...\nOut: "但不含action）
         prompt_builder.add_turn(
-            "human", f"What action should the robot take to {lang}, robot state: {state}?"
+            "human", f"What action should the robot take to {task_description}, robot state: {state_str}?"
         )
         prompt = prompt_builder.get_prompt()  # 注意gpt2默认不添加eos tokens
         prompt_ids = self.base_tokenizer(prompt)["input_ids"]
+        return prompt_ids
+
+    def tokenize_input(self, batch: Dict[str, Any]) -> dict:
+        # 定义vla的conversation prompt
+        lang = batch["language"].lower().strip()
+        state = batch["state"]
+        prompt_ids = self.tokenize_prompt(lang, state)
 
         return dict(
             pixel_values={"cam1": batch["cam1"], "cam2": batch["cam2"]},

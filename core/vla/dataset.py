@@ -66,6 +66,10 @@ class MyLeRobotDataset(torch.utils.data.Dataset):
     def __len__(self): return len(self.dataset)
         
     def __getitem__(self, index):
+        # NOTE: 前1000做validation
+        # if index <= 1000:
+        #     index == random.randint(1000, len(self.dataset))
+
         # 根据是哪一个具体的数据集，拿到对应的数据
         item = self.dataset.__getitem__(index)
         frame_index, episode_index = item['frame_index'], item['episode_index']
@@ -105,8 +109,8 @@ if __name__ == "__main__":
             NEED_MODEL = MODE in ("model", "both")
 
             # 采样策略（保持你之前默认：从9900开始，每100个取一个）
-            START_IDX = 0
-            STRIDE = 300
+            START_IDX = 9900
+            STRIDE = 100
 
             # 是否每个样本暂停（你之前是必暂停；这里默认保持一致）
             PAUSE_EACH_SAMPLE = True
@@ -123,9 +127,11 @@ if __name__ == "__main__":
 
             # 你的训练输出目录（用于加载 vla 模型）
             config_path = "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/" \
-            "2026-01-13/04-48-57/qwen2.5-0.5b+b16+x7--1-qwen25-abs_aff_uniform_bspline_v3"
-            ckpt_path = Path(config_path) / "checkpoints" / "step-015000-epoch-00-loss=0.1329.safetensors" # "latest-checkpoint.safetensors" # "step-035000-epoch-02-loss=0.0147.safetensors" # "step-085000-epoch-04-loss=0.0517.safetensors"
-
+                "2026-01-15/09-35-29/qwen2.5-0.5b+b32+x7--1-bspline_v3.2_validate_full_traj"
+            step = 55000
+            ckpt_path = next(
+                p for p in (Path(config_path) / "checkpoints").glob("step-*.safetensors") if int(p.name.split("-")[1]) == int(step)
+            )
             print("=" * 80)
             print("【数据集/模型 编码-解码测试】")
             print("=" * 80)
@@ -209,8 +215,11 @@ if __name__ == "__main__":
 
             # ==================== decode -> reconstruct -> error（不改变你核心逻辑） ====================
             def decode_and_reconstruct(token_ids: np.ndarray, abs_aff_gt: np.ndarray, frame_index: int):
+                frame_index = 0
+                
                 decoded_cp = trajectory_converter.decode_text_ids_to_trajectory(token_ids)
-
+                print("decoded_cp 开始几行:\n", decoded_cp[:5])
+                print("decoded_cp 结束几行:\n", decoded_cp[-5:])
                 # 你原来就是这样拿两个 bspline
                 bspline, gripper_bspline = vla_dataset.traj_compress.decode_to_action(decoded_cp)
 
@@ -237,6 +246,9 @@ if __name__ == "__main__":
                 gt_segment = abs_aff_gt[frame_index : frame_index + num_samples]
                 if len(reconstructed) != len(gt_segment):
                     print("⚠️ 重建长度与GT长度不匹配，进行裁剪对齐")
+                    print("重建长度:", len(reconstructed), "GT长度:", len(gt_segment))
+                    print("重建开始和结尾5个点:\n", reconstructed[:5], "\n...\n", reconstructed[-5:])
+                    print("GT开始和结尾5个点:\n", gt_segment[:5], "\n...\n", gt_segment[-5:])
                     min_len = min(len(reconstructed), len(gt_segment))
                     errors = np.abs(reconstructed[:min_len] - gt_segment[:min_len])
                 else:

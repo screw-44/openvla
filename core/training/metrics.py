@@ -69,8 +69,8 @@ class VLAMetrics:
         prompt_ids_length = input["prompt_ids_length"].to("cpu").numpy()
         predicts = output.logits.argmax(dim=2).to("cpu").numpy()
         batch_size = predicts.shape[0]
-        # print("label shape", batch["labels"].shape)
-        # print("input shape:", batch["input_ids"].shape)
+        # print("label shape", input["labels"].shape)
+        # print("input shape:", input["input_ids"].shape)
         # print("output logits shape:", output.logits.shape) # NOTE：这里输出中有image tokens，所以会远远长于输入
 
         total_correct, total_tokens = 0, 0  # token级别的准确率
@@ -82,6 +82,9 @@ class VLAMetrics:
             # GT: action tokens in labels (from start_idx onwards, excluding padding/eos)
             gt = labels[i, start_idx:]
             gt = gt[gt != -100]  # Remove IGNORE_INDEX padding
+            # print("label is:", labels[i])
+            # print("gt is:", gt)
+            # exit()
             # Pred: 注意这里还有image的tokens，所以长度不match。所以很难找到对应的输入
             # 同时看上去pred比输入整体往左偏移了1个token，（后面pad了一个token）。自回归的范式吧
             padding_length = (labels[i, start_idx:] == -100).sum()

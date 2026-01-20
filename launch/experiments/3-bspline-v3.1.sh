@@ -15,7 +15,7 @@ init_base_config
 # ============================================================================
 # 测试特定配置， 加入state + unfreeze vision encoder
 # ============================================================================
-EXPERIMENT_NAME='1-qwen25-abs_aff_uniform_bspline_v3.1'
+EXPERIMENT_NAME='1-bspline_v3.2_validate_full_traj'
 RUN_ID_NOTE="${EXPERIMENT_NAME}"
 
 # 模型配置
@@ -76,8 +76,8 @@ TRAIN_CMD="torchrun --standalone --nnodes 1 --nproc-per-node ${NUM_GPUS} scripts
     run_root_dir=${RUN_ROOT_DIR} \
     run_id_note=\"${CURRENT_RUN_ID}\" \
     save_interval=${SAVE_INTERVAL} \
-    vla.optimization.per_device_batch_size=16 \
-    vla.optimization.global_batch_size=64 \
+    vla.optimization.per_device_batch_size=32 \
+    vla.optimization.global_batch_size=128 \
     epochs=${EPOCHS} \
     project=${PROJECT}"
 

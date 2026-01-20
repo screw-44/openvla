@@ -28,8 +28,8 @@ VIDEO_OUTPUT_DIR = "./eval_videos"
 os.makedirs(VIDEO_OUTPUT_DIR, exist_ok=True)
 VIZ_OUTPUT_DIR = "/tmp/"
 
-NUM_EPISODES = 10
-NUM_TASK = 1
+NUM_EPISODES = 2
+NUM_TASK = 10
 PRED_GAP = 150        
 SMOOTH_RATIO = 1
 MAX_STEPS = 150
@@ -171,9 +171,21 @@ class LiberoEvaluator:
             self.image_transform(cam2_pil).unsqueeze(0).to(self.device, dtype=torch.bfloat16)
         )
 
+        # STATE从哪里拿出来？
+        # for key, value in obs.items():
+        #     print("key:", key, ", value:", value)
+
+        eef_pos = obs["robot0_eef_pos"]              # (3,)
+        eef_quat = obs["robot0_eef_quat"]            # (4,) xyzw
+        eef_euler = R.from_quat(eef_quat).as_rotvec()
+        gripper_qpos = obs["robot0_gripper_qpos"]    # (2,)
+        state = np.concatenate([eef_pos, eef_euler, gripper_qpos])  # (3+3+2=8,)
+        precision = 4
+        state = "[" + ", ".join([f"{x:.{precision}f}" for x in state]) + "]"
+
         # B. 文本处理 (使用 PromptBuilder, 参考VlaTokenizer的实现)
         prompt_builder = self.prompt_builder_fn("openvla")
-        prompt_builder.add_turn("human", f"What action should the robot take to {task_description}?")
+        prompt_builder.add_turn("human", f"What action should the robot take to {task_description}?, robot state: {state}")
         prompt_text = prompt_builder.get_prompt()
         print("prompt text:", prompt_text)
 
@@ -219,8 +231,8 @@ class LiberoEvaluator:
         knots = decoded_cp[:, -1]
         print("predicted knots:", knots)
         num_samples = int(knots[-1]) + 1 
-        t_eval = np.arange(num_samples)
-        
+        # t_eval = np.arange(num_samples)
+        t_eval = np.arange(knots[0], knots[-1] + 1)  # 从第一个 knot 开始采样
         # [N, 6]
         traj_pose = bspline(t_eval) 
         # [N, 1]
@@ -265,12 +277,13 @@ def run_eval():
         "converter_type": "bspline_v3",
     }
     
-    base_path = Path("/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/2026-01-13/04-48-57/qwen2.5-0.5b+b16+x7--1-qwen25-abs_aff_uniform_bspline_v3")
-    cfg_path = base_path / ".hydra" / "config.yaml"
-    if not cfg_path.exists():
-        cfg_path = base_path / "config.yaml"
-    ckpt_path = base_path / "checkpoints" / "step-035000-epoch-02-loss=0.0147.safetensors" # step-085000-epoch-04-loss=0.0517.safetensors" # "step-055000-epoch-03-loss=0.0210.safetensors"
-
+    base_path = "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/" \
+        "2026-01-15/09-35-29/qwen2.5-0.5b+b32+x7--1-bspline_v3.2_validate_full_traj"
+    cfg_path = Path(base_path) / "config.yaml"
+    step = 55000
+    ckpt_path = next(
+        p for p in (Path(base_path) / "checkpoints").glob("step-*.safetensors") if int(p.name.split("-")[1]) == int(step)
+    )
     # 2. 初始化 Evaluator
     evaluator = LiberoEvaluator(cfg_path, ckpt_path, config_dict)
 

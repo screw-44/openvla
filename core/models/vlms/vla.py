@@ -32,6 +32,8 @@ class VLA(PrismaticVLM):
         self.trajectory_converter = trajectory_converter
         self.dataset_id = dataset_id
 
+    
+
     @torch.inference_mode()
     def generate(
         self,

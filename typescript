@@ -1,0 +1,992 @@
+Script started on 2026-01-16 01:50:04+00:00 [TERM="xterm-256color" TTY="/dev/pts/22" COLUMNS="165" LINES="87"]
+[32m══════════════════════════ 欢迎使用 Inspire Studio ══════════════════════════[0m
+
+[36m目录信息[0m
+[90m┌─────────────────────────────────────────────────────────────────────────────[0m
+[90m│[0m [33m项目公共目录:[0m
+[90m│[0m • /inspire/hdd/project/robot-decision/public
+[90m│[0m • /inspire/qb-ilm/project/robot-decision/public
+[90m│[0m • /inspire/ssd/project/robot-decision/public
+[90m│[0m
+[90m│[0m [33m项目个人目录:[0m
+[90m│[0m • /inspire/qb-ilm/project/robot-decision/hexinyu-253108100063
+[90m│[0m • /inspire/ssd/project/robot-decision/hexinyu-253108100063
+[90m│[0m • /inspire/hdd/project/robot-decision/hexinyu-253108100063
+[90m│[0m
+[90m│[0m [33m全局公共目录:[0m
+[90m│[0m • /inspire/hdd/global_public
+[90m│[0m
+[90m│[0m [33m个人全局目录:[0m
+[90m│[0m • /inspire/hdd/global_user/hexinyu-253108100063
+[90m└─────────────────────────────────────────────────────────────────────────────[0m
+
+[33mTips:[0m
+[33m1. 请仅在上述路径内存放数据或代码,其它路径的文件会在Notebook停止时被清理,无法恢复[0m
+[33m2. 如对环境做了修改(例如新增依赖的包、库等)请及时保存镜像[0m
+[33m3. 请将HuggingFace、Rclone、pip、Conda等软件的缓存路径设为个人全局目录,以避免镜像文件体积过大[0m
+
+[37m----------------------------------------------------------------------------------------------------------------------[0m
+cd scri	检测到 NVIDIAGeForceRTX4090 显卡，已启用离线模式（可以手动改成在线）
+[?2004h(openvla) [root:vla]$ cd scripts/t[K
+[?2004l[?2004h(openvla) [root:scripts]$ ls
+[?2004l [0m[01;34m__pycache__[0m   eval.py   [01;34meval_results[0m   [01;34meval_videos[0m  [01;34m'eval_videos 3w'[0m  [01;34m'eval_videos_single 8w'[0m   libero_eval.py   train.py
+[?2004h(openvla) [root:scripts]$ python libero_eval.py
+[?2004lLoading model from /inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/2026-01-15/09-35-29/qwen2.5-0.5b+b32+x7--1-bspline_v3.2_validate_full_traj/checkpoints/step-055000-epoch-06-loss=0.0166.safetensors...
+Traceback (most recent call last):
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/scripts/libero_eval.py", line 406, in <module>
+    run_eval()
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/scripts/libero_eval.py", line 287, in run_eval
+    evaluator = LiberoEvaluator(cfg_path, ckpt_path, config_dict)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/scripts/libero_eval.py", line 97, in __init__
+    self._load_model_and_converter(cfg_path, ckpt_path)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/scripts/libero_eval.py", line 108, in _load_model_and_converter
+    cfg = OmegaConf.load(cfg_path)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/omegaconf/omegaconf.py", line 189, in load
+    with io.open(os.path.abspath(file_), "r", encoding="utf-8") as f:
+IsADirectoryError: [Errno 21] Is a directory: '/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/2026-01-15/09-35-29/qwen2.5-0.5b+b32+x7--1-bspline_v3.2_validate_full_traj'
+[?2004h(openvla) [root:scripts]$ python libero_eval.py
+[?2004lLoading model from /inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/2026-01-15/09-35-29/qwen2.5-0.5b+b32+x7--1-bspline_v3.2_validate_full_traj/checkpoints/step-055000-epoch-06-loss=0.0166.safetensors...
+Traceback (most recent call last):
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/scripts/libero_eval.py", line 407, in <module>
+    run_eval()
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/scripts/libero_eval.py", line 288, in run_eval
+    evaluator = LiberoEvaluator(cfg_path, ckpt_path, config_dict)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/scripts/libero_eval.py", line 97, in __init__
+    self._load_model_and_converter(cfg_path, ckpt_path)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/scripts/libero_eval.py", line 108, in _load_model_and_converter
+    cfg = OmegaConf.load(cfg_path)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/omegaconf/omegaconf.py", line 189, in load
+    with io.open(os.path.abspath(file_), "r", encoding="utf-8") as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/2026-01-15/09-35-29/qwen2.5-0.5b+b32+x7--1-bspline_v3.2_validate_full_traj/.hydra/config.yaml'
+[?2004h(openvla) [root:scripts]$ python libero_eval.py
+[?2004lLoading model from /inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/2026-01-15/09-35-29/qwen2.5-0.5b+b32+x7--1-bspline_v3.2_validate_full_traj/checkpoints/step-055000-epoch-06-loss=0.0166.safetensors...
+[2;36m01/16 [01:51:40][0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m [1m[[0mDEBUG[1m][0m vla_cfg type: [1m<[0m[1;95mclass[0m[39m [0m[32m'omegaconf.dictconfig.DictConfig'[0m[1m>[0m                                                        ]8;id=655484;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=584591;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#113\[2m113[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m [1m[[0mDEBUG[1m][0m vla_id: qwen2.[1;36m5[0m-[1;36m0.[0m5b                                                                                           ]8;id=158739;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=119190;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#114\[2m114[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m [1m[[0mDEBUG[1m][0m base_vlm: qwen2.[1;36m5[0m-[1;36m0.[0m5b                                                                                         ]8;id=90271;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=917748;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#115\[2m115[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Loading from checkpoints:                                                                                              ]8;id=458884;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=851391;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#122\[2m122[0m]8;;\
+[2;36m                 [0m         [35m/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/2026-01-15/09-35-29/qwen2.5-0.5b+b32+x7--1-bsp[0m [2m           [0m
+[2;36m                 [0m         [35mline_v3.2_validate_full_traj/checkpoints/[0m[95mstep-055000-epoch-06-[0m[95mloss[0m=[1;36m0[0m[1;36m.0166[0m.safetensors                                           [2m           [0m
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Model Configuration:                                                                                                   ]8;id=231606;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=246504;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#149\[2m149[0m]8;;\
+[2;36m                 [0m           Vision Backbone:  [1msiglip-vit-b16-224px[0m                                                                                        [2m           [0m
+[2;36m                 [0m           LLM Backbone:     [1mqwen2.[0m[1;36m5[0m[1m-[0m[1;36m0.[0m[1m5b-instruct[0m                                                                                       [2m           [0m
+[2;36m                 [0m           Arch Specifier:   [1mgelu-mlp[0m                                                                                                    [2m           [0m
+[2;36m                 [0m           Checkpoint:                                                                                                                   [2m           [0m
+[2;36m                 [0m         [4;35m/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/2026-01-15/09-35-29/qwen2.5-0.5b+b32+x7--1-bsp[0m [2m           [0m
+[2;36m                 [0m         [4;35mline_v3.2_validate_full_traj/checkpoints/[0m[4;95mstep-055000-epoch-06-[0m[4;95mloss[0m[4m=[0m[1;4;36m0[0m[1;4;36m.0166[0m[4m.safetensors[0m                                           [2m           [0m
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Loading Vision Backbone [1msiglip-vit-b16-224px[0m                                                                           ]8;id=822136;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=603798;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#159\[2m159[0m]8;;\
+[2;36m01/16 [01:51:41][0m[2;36m [0m[34mINFO    [0m | >> Loading pretrained weights from Hugging Face hub [1m([0m[1m([0m[32m'timm/ViT-B-16-SigLIP'[0m, [32m'open_clip_pytorch_model.bin'[0m[1m)[0m[1m)[0m             ]8;id=473035;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/timm/models/_builder.py\[2m_builder.py[0m]8;;\[2m:[0m]8;id=847255;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/timm/models/_builder.py#186\[2m186[0m]8;;\
+[2;36m01/16 [01:51:42][0m[2;36m [0m[34mINFO    [0m | >>  Safe alternative available for [32m'open_clip_pytorch_model.bin'[0m [1m([0mas [32m'open_clip_model.safetensors'[0m[1m)[0m. Loading weights using    ]8;id=545642;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/timm/models/_hub.py\[2m_hub.py[0m]8;;\[2m:[0m]8;id=868924;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/timm/models/_hub.py#180\[2m180[0m]8;;\
+[2;36m                 [0m         safetensors.                                                                                                                    [2m           [0m
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Loading LLM Backbone [1mqwen2.[0m[1;36m5[0m[1m-[0m[1;36m0.[0m[1m5b-instruct[0m [1m([0mmode: inference[1m)[0m                                                           ]8;id=757504;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=409418;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#166\[2m166[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >>     |=> Loading [1mqwen2[0m LLM from local cache [4m`Qwen/Qwen2.[0m[1;4;36m5[0m[4m-[0m[1;4;36m0.[0m[4m5B-Instruct`[0m                                                ]8;id=481313;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/backbones/llm/base_llm.py\[2mbase_llm.py[0m]8;;\[2m:[0m]8;id=149545;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/backbones/llm/base_llm.py#118\[2m118[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >>     |=> Loading [1mqwen2[0m [1m([0mFast[1m)[0m Tokenizer via the AutoTokenizer API [1m([0mlocal cache[1m)[0m                                         ]8;id=515447;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/backbones/llm/base_llm.py\[2mbase_llm.py[0m]8;;\[2m:[0m]8;id=813771;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/backbones/llm/base_llm.py#154\[2m154[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Creating Trajectory Converter [1mbspline_v3[0m                                                                                ]8;id=319128;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=208274;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#74\[2m74[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m ✓ Loaded quantile edges from                                                                                      ]8;id=110891;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/vla/tokenizer.py\[2mtokenizer.py[0m]8;;\[2m:[0m]8;id=853501;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/vla/tokenizer.py#179\[2m179[0m]8;;\
+[2;36m                 [0m         [35m/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/assets/[0m[95mcontrol_point_bin_distribution.npy[0m         [2m                [0m
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Initializing OpenVLA model                                                                                             ]8;id=559279;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=964183;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#180\[2m180[0m]8;;\
+[2;36m01/16 [01:51:44][0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Successfully loaded checkpoint from safetensors                                                                   ]8;id=38539;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/vlms/prismatic.py\[2mprismatic.py[0m]8;;\[2m:[0m]8;id=754413;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/vlms/prismatic.py#149\[2m149[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Loadding has finish on custom projector and llm_backbone                                                          ]8;id=495527;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/vlms/prismatic.py\[2mprismatic.py[0m]8;;\[2m:[0m]8;id=141726;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/vlms/prismatic.py#159\[2m159[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Loading for inference, use evaluation mode.                                                                            ]8;id=906077;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=18618;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#206\[2m206[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m ✅ Successfully loaded OpenVLA model                                                                                   ]8;id=794145;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=823973;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#210\[2m210[0m]8;;\
+Initializing converter and dataset info...
+[2;36m01/16 [01:51:45][0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m ✓ Loaded quantile edges from                                                                                      ]8;id=181792;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/vla/tokenizer.py\[2mtokenizer.py[0m]8;;\[2m:[0m]8;id=718777;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/vla/tokenizer.py#179\[2m179[0m]8;;\
+[2;36m                 [0m         [35m/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/assets/[0m[95mcontrol_point_bin_distribution.npy[0m         [2m                [0m
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m training dataset length:[1;36m273465[0m                                                                                       ]8;id=672189;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/vla/dataset.py\[2mdataset.py[0m]8;;\[2m:[0m]8;id=132780;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/vla/dataset.py#61\[2m61[0m]8;;\
+Videos will be saved to: ./eval_videos
+[info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+Local assets not found. Downloading from HuggingFace Hub...
+Assets already downloaded at /root/.cache/libero/assets
+
+=== Evaluating Task 0: pick_up_the_alphabet_soup_and_place_it_in_the_basket ===
+Episode 0:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.15644375 -0.00879616  0.24219255 -3.13186285  0.0984866  -0.02200334]
+prompt text: In:What action should the robot take to pick up the alphabet soup and place it in the basket?, robot state: [-0.1564, -0.0088, 0.2422, -3.1268, 0.0352, 0.1539, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 27790, 19174,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    20,    21,
+            19,    11,   481,    15,    13,    15,    15,    23,    23,    11,
+           220,    15,    13,    17,    19,    17,    17,    11,   481,    18,
+            13,    16,    17,    21,    23,    11,   220,    15,    13,    15,
+            18,    20,    17,    11,   220,    15,    13,    16,    20,    18,
+            24,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-82. -71. -62. -54. -47. -39. -36. -29. -22. -17. -10.   2.  19.  23.
+  25.  35.  38.  42.  45.  67.  67.  67.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 0:   1%|▊                                                                                                                    | 1/150 [00:08<20:30,  8.26s/it]Episode 0:   5%|█████▍                                                                                                               | 7/150 [00:08<02:05,  1.14it/s]Episode 0:   9%|██████████                                                                                                          | 13/150 [00:08<00:54,  2.54it/s]Episode 0:  13%|███████████████▍                                                                                                    | 20/150 [00:08<00:27,  4.73it/s]Episode 0:  18%|████████████████████▉                                                                                               | 27/150 [00:08<00:16,  7.60it/s]Episode 0:  23%|██████████████████████████▎                                                                                         | 34/150 [00:08<00:10, 11.22it/s]Episode 0:  27%|██████████████████████████████▉                                                                                     | 40/150 [00:08<00:07, 14.96it/s]Episode 0:  31%|███████████████████████████████████▌                                                                                | 46/150 [00:09<00:05, 19.28it/s]Episode 0:  35%|████████████████████████████████████████▉                                                                           | 53/150 [00:09<00:03, 25.14it/s]Episode 0:  40%|██████████████████████████████████████████████▍                                                                     | 60/150 [00:09<00:02, 31.30it/s]Episode 0:  45%|███████████████████████████████████████████████████▊                                                                | 67/150 [00:09<00:02, 37.37it/s]current_pose_input: [ 0.01150302  0.26818968  0.1885435   3.04465535  0.16173107 -0.03779595]
+prompt text: In:What action should the robot take to pick up the alphabet soup and place it in the basket?, robot state: [0.0115, 0.2682, 0.1885, 3.0375, -0.0455, -0.2489, 0.0391, -0.0393]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 27790, 19174,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25,   508,    15,    13,    15,    16,    16,
+            20,    11,   220,    15,    13,    17,    21,    23,    17,    11,
+           220,    15,    13,    16,    23,    23,    20,    11,   220,    18,
+            13,    15,    18,    22,    20,    11,   481,    15,    13,    15,
+            19,    20,    20,    11,   481,    15,    13,    17,    19,    23,
+            24,    11,   220,    15,    13,    15,    18,    24,    16,    11,
+           481,    15,    13,    15,    18,    24,    18,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-153. -148. -146. -136. -135. -120. -119. -110. -102.  -99.  -95.  -87.
+  -82.  -77.  -61.  -59.  -48.  -45.  -42.  -41.  -38.  -29.  -24.  -22.
+  -10.   -5.   -4.   -4.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+[33mEpisode 0 - Step 68: Prediction failed or too short, taking zero action.[0m
+                                                                                                                                                                     [31mEpisode 0 Failed.[0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_0_ep0_Failed.mp4
+Episode 1:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.15036399 -0.00364075  0.25968443  3.13653371  0.06327981  0.01635084]
+prompt text: In:What action should the robot take to pick up the alphabet soup and place it in the basket?, robot state: [-0.1504, -0.0036, 0.2597, 3.1343, 0.0259, -0.0991, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 27790, 19174,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    20,    15,
+            19,    11,   481,    15,    13,    15,    15,    18,    21,    11,
+           220,    15,    13,    17,    20,    24,    22,    11,   220,    18,
+            13,    16,    18,    19,    18,    11,   220,    15,    13,    15,
+            17,    20,    24,    11,   481,    15,    13,    15,    24,    24,
+            16,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-95. -89. -79. -75. -67. -63. -58. -45. -41. -37. -31. -24. -21. -11.
+  -3.   8.  14.  20.  36.  38.  44.  45.  58.  58.  58.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:   1%|▊                                                                                                                    | 1/150 [00:08<20:40,  8.32s/it]Episode 1:   5%|██████▏                                                                                                              | 8/150 [00:08<01:49,  1.30it/s]Episode 1:  10%|███████████▌                                                                                                        | 15/150 [00:08<00:46,  2.90it/s]Episode 1:  15%|█████████████████                                                                                                   | 22/150 [00:08<00:25,  5.07it/s]Episode 1:  19%|██████████████████████▍                                                                                             | 29/150 [00:08<00:15,  7.90it/s]Episode 1:  24%|███████████████████████████▊                                                                                        | 36/150 [00:08<00:09, 11.49it/s]Episode 1:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:08<00:06, 15.91it/s]Episode 1:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:09<00:04, 21.13it/s]Episode 1:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:09<00:03, 26.92it/s]current_pose_input: [-0.1621581   0.25978552  0.1760428  -3.1323234  -0.00461055  0.02262495]
+prompt text: In:What action should the robot take to pick up the alphabet soup and place it in the basket?, robot state: [-0.1622, 0.2598, 0.1760, -3.1321, -0.0355, -0.0071, 0.0391, -0.0391]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 27790, 19174,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    21,    17,
+            17,    11,   220,    15,    13,    17,    20,    24,    23,    11,
+           220,    15,    13,    16,    22,    21,    15,    11,   481,    18,
+            13,    16,    18,    17,    16,    11,   481,    15,    13,    15,
+            18,    20,    20,    11,   481,    15,    13,    15,    15,    22,
+            16,    11,   220,    15,    13,    15,    18,    24,    16,    11,
+           481,    15,    13,    15,    18,    24,    16,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-188. -173. -169. -164. -146. -138. -133. -124. -118. -113. -109. -103.
+  -92.  -85.  -77.  -73.  -69.  -61.  -41.  -37.  -33.  -31.  -28.  -18.
+  -16.  -13.   -3.    1.    1.    1.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+current_pose_input: [-1.60656582e-01  2.59366420e-01  1.78579594e-01 -3.13265357e+00
+  2.34732858e-03  2.33073301e-02]
+prompt text: In:What action should the robot take to pick up the alphabet soup and place it in the basket?, robot state: [-0.1607, 0.2594, 0.1786, -3.1325, -0.0365, 0.0038, 0.0392, -0.0392]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 27790, 19174,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    21,    15,
+            22,    11,   220,    15,    13,    17,    20,    24,    19,    11,
+           220,    15,    13,    16,    22,    23,    21,    11,   481,    18,
+            13,    16,    18,    17,    20,    11,   481,    15,    13,    15,
+            18,    21,    20,    11,   220,    15,    13,    15,    15,    18,
+            23,    11,   220,    15,    13,    15,    18,    24,    17,    11,
+           481,    15,    13,    15,    18,    24,    17,   921,  2662,    25]],
+       device='cuda:0')
+^CTraceback (most recent call last):
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/scripts/libero_eval.py", line 407, in <module>
+    run_eval()
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/scripts/libero_eval.py", line 349, in run_eval
+    smoothed_traj = evaluator.predict_and_decode(
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/scripts/libero_eval.py", line 202, in predict_and_decode
+    pred_ids = GenerationMixin.generate(
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/transformers/generation/utils.py", line 2564, in generate
+    result = decoding_method(
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/transformers/generation/utils.py", line 2784, in _sample
+    outputs = self(**model_inputs, return_dict=True)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/vlms/prismatic.py", line 457, in forward
+    output = self.llm_backbone(
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/backbones/llm/base_llm.py", line 199, in forward
+    output: CausalLMOutputWithPast = self.llm(
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/transformers/utils/generic.py", line 918, in wrapper
+    output = func(self, *args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/transformers/models/qwen2/modeling_qwen2.py", line 449, in forward
+    outputs: BaseModelOutputWithPast = self.model(
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/transformers/utils/generic.py", line 1064, in wrapper
+    outputs = func(self, *args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/transformers/models/qwen2/modeling_qwen2.py", line 384, in forward
+    hidden_states = decoder_layer(
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/transformers/modeling_layers.py", line 94, in __call__
+    return super().__call__(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/transformers/utils/deprecation.py", line 172, in wrapped_func
+    return func(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/transformers/models/qwen2/modeling_qwen2.py", line 249, in forward
+    hidden_states = self.mlp(hidden_states)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/transformers/models/qwen2/modeling_qwen2.py", line 46, in forward
+    down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/torch/nn/modules/linear.py", line 125, in forward
+    return F.linear(input, self.weight, self.bias)
+KeyboardInterrupt
+^C^C
+[?2004h(openvla) [root:scripts]$ ^C[?2004l[?2004h[?2004l
+[?2004h(openvla) [root:scripts]$ ^C[?2004l[?2004h[?2004l
+[?2004h(openvla) [root:scripts]$ python libero_eval.py
+[?2004lLoading model from /inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/2026-01-15/09-35-29/qwen2.5-0.5b+b32+x7--1-bspline_v3.2_validate_full_traj/checkpoints/step-055000-epoch-06-loss=0.0166.safetensors...
+[2;36m01/16 [01:58:22][0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m [1m[[0mDEBUG[1m][0m vla_cfg type: [1m<[0m[1;95mclass[0m[39m [0m[32m'omegaconf.dictconfig.DictConfig'[0m[1m>[0m                                                        ]8;id=695363;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=416454;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#113\[2m113[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m [1m[[0mDEBUG[1m][0m vla_id: qwen2.[1;36m5[0m-[1;36m0.[0m5b                                                                                           ]8;id=230389;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=792881;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#114\[2m114[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m [1m[[0mDEBUG[1m][0m base_vlm: qwen2.[1;36m5[0m-[1;36m0.[0m5b                                                                                         ]8;id=37013;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=681557;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#115\[2m115[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Loading from checkpoints:                                                                                              ]8;id=229225;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=967889;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#122\[2m122[0m]8;;\
+[2;36m                 [0m         [35m/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/2026-01-15/09-35-29/qwen2.5-0.5b+b32+x7--1-bsp[0m [2m           [0m
+[2;36m                 [0m         [35mline_v3.2_validate_full_traj/checkpoints/[0m[95mstep-055000-epoch-06-[0m[95mloss[0m=[1;36m0[0m[1;36m.0166[0m.safetensors                                           [2m           [0m
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Model Configuration:                                                                                                   ]8;id=756560;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=454366;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#149\[2m149[0m]8;;\
+[2;36m                 [0m           Vision Backbone:  [1msiglip-vit-b16-224px[0m                                                                                        [2m           [0m
+[2;36m                 [0m           LLM Backbone:     [1mqwen2.[0m[1;36m5[0m[1m-[0m[1;36m0.[0m[1m5b-instruct[0m                                                                                       [2m           [0m
+[2;36m                 [0m           Arch Specifier:   [1mgelu-mlp[0m                                                                                                    [2m           [0m
+[2;36m                 [0m           Checkpoint:                                                                                                                   [2m           [0m
+[2;36m                 [0m         [4;35m/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/outputs/2026-01-15/09-35-29/qwen2.5-0.5b+b32+x7--1-bsp[0m [2m           [0m
+[2;36m                 [0m         [4;35mline_v3.2_validate_full_traj/checkpoints/[0m[4;95mstep-055000-epoch-06-[0m[4;95mloss[0m[4m=[0m[1;4;36m0[0m[1;4;36m.0166[0m[4m.safetensors[0m                                           [2m           [0m
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Loading Vision Backbone [1msiglip-vit-b16-224px[0m                                                                           ]8;id=405602;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=145502;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#159\[2m159[0m]8;;\
+[2;36m01/16 [01:58:24][0m[2;36m [0m[34mINFO    [0m | >> Loading pretrained weights from Hugging Face hub [1m([0m[1m([0m[32m'timm/ViT-B-16-SigLIP'[0m, [32m'open_clip_pytorch_model.bin'[0m[1m)[0m[1m)[0m             ]8;id=414457;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/timm/models/_builder.py\[2m_builder.py[0m]8;;\[2m:[0m]8;id=929922;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/timm/models/_builder.py#186\[2m186[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >>  Safe alternative available for [32m'open_clip_pytorch_model.bin'[0m [1m([0mas [32m'open_clip_model.safetensors'[0m[1m)[0m. Loading weights using    ]8;id=957977;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/timm/models/_hub.py\[2m_hub.py[0m]8;;\[2m:[0m]8;id=889547;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/timm/models/_hub.py#180\[2m180[0m]8;;\
+[2;36m                 [0m         safetensors.                                                                                                                    [2m           [0m
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Loading LLM Backbone [1mqwen2.[0m[1;36m5[0m[1m-[0m[1;36m0.[0m[1m5b-instruct[0m [1m([0mmode: inference[1m)[0m                                                           ]8;id=372828;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=23416;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#166\[2m166[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >>     |=> Loading [1mqwen2[0m LLM from local cache [4m`Qwen/Qwen2.[0m[1;4;36m5[0m[4m-[0m[1;4;36m0.[0m[4m5B-Instruct`[0m                                                ]8;id=835285;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/backbones/llm/base_llm.py\[2mbase_llm.py[0m]8;;\[2m:[0m]8;id=618464;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/backbones/llm/base_llm.py#118\[2m118[0m]8;;\
+[2;36m01/16 [01:58:25][0m[2;36m [0m[34mINFO    [0m | >>     |=> Loading [1mqwen2[0m [1m([0mFast[1m)[0m Tokenizer via the AutoTokenizer API [1m([0mlocal cache[1m)[0m                                         ]8;id=736965;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/backbones/llm/base_llm.py\[2mbase_llm.py[0m]8;;\[2m:[0m]8;id=386775;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/backbones/llm/base_llm.py#154\[2m154[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Creating Trajectory Converter [1mbspline_v3[0m                                                                                ]8;id=16014;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=259372;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#74\[2m74[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m ✓ Loaded quantile edges from                                                                                      ]8;id=44696;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/vla/tokenizer.py\[2mtokenizer.py[0m]8;;\[2m:[0m]8;id=246136;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/vla/tokenizer.py#179\[2m179[0m]8;;\
+[2;36m                 [0m         [35m/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/assets/[0m[95mcontrol_point_bin_distribution.npy[0m         [2m                [0m
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Initializing OpenVLA model                                                                                             ]8;id=476673;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=401503;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#180\[2m180[0m]8;;\
+[2;36m01/16 [01:58:27][0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Successfully loaded checkpoint from safetensors                                                                   ]8;id=476520;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/vlms/prismatic.py\[2mprismatic.py[0m]8;;\[2m:[0m]8;id=824410;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/vlms/prismatic.py#149\[2m149[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Loadding has finish on custom projector and llm_backbone                                                          ]8;id=256105;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/vlms/prismatic.py\[2mprismatic.py[0m]8;;\[2m:[0m]8;id=916314;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/vlms/prismatic.py#159\[2m159[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m Loading for inference, use evaluation mode.                                                                            ]8;id=357477;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=909126;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#206\[2m206[0m]8;;\
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m ✅ Successfully loaded OpenVLA model                                                                                   ]8;id=572008;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py\[2mload.py[0m]8;;\[2m:[0m]8;id=335526;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/models/load.py#210\[2m210[0m]8;;\
+Initializing converter and dataset info...
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m ✓ Loaded quantile edges from                                                                                      ]8;id=935734;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/vla/tokenizer.py\[2mtokenizer.py[0m]8;;\[2m:[0m]8;id=451023;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/vla/tokenizer.py#179\[2m179[0m]8;;\
+[2;36m                 [0m         [35m/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/assets/[0m[95mcontrol_point_bin_distribution.npy[0m         [2m                [0m
+[2;36m                [0m[2;36m [0m[34mINFO    [0m | >> [1m[[0m*[1m][0m training dataset length:[1;36m273465[0m                                                                                       ]8;id=383898;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/vla/dataset.py\[2mdataset.py[0m]8;;\[2m:[0m]8;id=207132;file:///inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/core/vla/dataset.py#61\[2m61[0m]8;;\
+Videos will be saved to: ./eval_videos
+[info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+Local assets not found. Downloading from HuggingFace Hub...
+Assets already downloaded at /root/.cache/libero/assets
+
+=== Evaluating Task 0: pick_up_the_alphabet_soup_and_place_it_in_the_basket ===
+Episode 0:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.15644375 -0.00879616  0.24219255 -3.13186285  0.0984866  -0.02200334]
+prompt text: In:What action should the robot take to pick up the alphabet soup and place it in the basket?, robot state: [-0.1564, -0.0088, 0.2422, -3.1268, 0.0352, 0.1539, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 27790, 19174,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    20,    21,
+            19,    11,   481,    15,    13,    15,    15,    23,    23,    11,
+           220,    15,    13,    17,    19,    17,    17,    11,   481,    18,
+            13,    16,    17,    21,    23,    11,   220,    15,    13,    15,
+            18,    20,    17,    11,   220,    15,    13,    16,    20,    18,
+            24,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-82. -71. -62. -54. -47. -39. -36. -29. -22. -17. -10.   2.  19.  23.
+  25.  35.  38.  42.  45.  67.  67.  67.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 0:   1%|▊                                                                                                                    | 1/150 [00:08<20:17,  8.17s/it]Episode 0:   5%|██████▏                                                                                                              | 8/150 [00:08<01:47,  1.32it/s]Episode 0:  10%|███████████▌                                                                                                        | 15/150 [00:08<00:45,  2.96it/s]Episode 0:  15%|█████████████████                                                                                                   | 22/150 [00:08<00:24,  5.16it/s]Episode 0:  19%|██████████████████████▍                                                                                             | 29/150 [00:08<00:15,  8.04it/s]Episode 0:  24%|███████████████████████████▊                                                                                        | 36/150 [00:08<00:09, 11.71it/s]Episode 0:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:08<00:06, 16.19it/s]Episode 0:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:08<00:04, 20.54it/s]Episode 0:  37%|███████████████████████████████████████████▎                                                                        | 56/150 [00:09<00:03, 24.46it/s]Episode 0:  41%|███████████████████████████████████████████████▉                                                                    | 62/150 [00:09<00:03, 28.47it/s]Episode 0:  45%|████████████████████████████████████████████████████▌                                                               | 68/150 [00:09<00:02, 32.25it/s]Episode 0:  49%|█████████████████████████████████████████████████████████▏                                                          | 74/150 [00:09<00:02, 35.63it/s]Episode 0:  53%|█████████████████████████████████████████████████████████████                                                       | 79/150 [00:09<00:01, 38.20it/s]Episode 0:  57%|█████████████████████████████████████████████████████████████████▋                                                  | 85/150 [00:09<00:01, 41.26it/s]Episode 0:  61%|██████████████████████████████████████████████████████████████████████▎                                             | 91/150 [00:09<00:01, 43.90it/s]Episode 0:  65%|███████████████████████████████████████████████████████████████████████████                                         | 97/150 [00:09<00:01, 45.94it/s]Episode 0:  69%|██████████████████████████████████████████████████████████████████████████████▉                                    | 103/150 [00:10<00:00, 47.00it/s]Episode 0:  73%|███████████████████████████████████████████████████████████████████████████████████▌                               | 109/150 [00:10<00:00, 48.14it/s]Episode 0:  77%|████████████████████████████████████████████████████████████████████████████████████████▏                          | 115/150 [00:10<00:00, 48.66it/s]Episode 0:  81%|████████████████████████████████████████████████████████████████████████████████████████████▊                      | 121/150 [00:10<00:00, 49.22it/s]Episode 0:  85%|█████████████████████████████████████████████████████████████████████████████████████████████████▎                 | 127/150 [00:10<00:00, 50.03it/s]Episode 0:  89%|█████████████████████████████████████████████████████████████████████████████████████████████████████▉             | 133/150 [00:10<00:00, 50.51it/s]                                                                                                                                                                     [32mEpisode 0 Success![0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_0_ep0_Success.mp4
+Episode 1:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.15036399 -0.00364075  0.25968443  3.13653371  0.06327981  0.01635084]
+prompt text: In:What action should the robot take to pick up the alphabet soup and place it in the basket?, robot state: [-0.1504, -0.0036, 0.2597, 3.1343, 0.0259, -0.0991, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 27790, 19174,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    20,    15,
+            19,    11,   481,    15,    13,    15,    15,    18,    21,    11,
+           220,    15,    13,    17,    20,    24,    22,    11,   220,    18,
+            13,    16,    18,    19,    18,    11,   220,    15,    13,    15,
+            17,    20,    24,    11,   481,    15,    13,    15,    24,    24,
+            16,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-95. -89. -79. -75. -67. -63. -58. -45. -41. -37. -31. -24. -21. -11.
+  -3.   8.  14.  20.  36.  38.  44.  45.  58.  58.  58.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:   1%|▊                                                                                                                    | 1/150 [00:08<20:53,  8.41s/it]Episode 1:   5%|██████▏                                                                                                              | 8/150 [00:08<01:50,  1.28it/s]Episode 1:  10%|███████████▌                                                                                                        | 15/150 [00:08<00:46,  2.88it/s]Episode 1:  15%|█████████████████                                                                                                   | 22/150 [00:08<00:25,  5.02it/s]Episode 1:  19%|██████████████████████▍                                                                                             | 29/150 [00:08<00:15,  7.84it/s]Episode 1:  24%|███████████████████████████▊                                                                                        | 36/150 [00:08<00:09, 11.44it/s]Episode 1:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:09<00:06, 15.86it/s]Episode 1:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:09<00:04, 20.41it/s]Episode 1:  37%|███████████████████████████████████████████▎                                                                        | 56/150 [00:09<00:03, 24.06it/s]Episode 1:  41%|███████████████████████████████████████████████▉                                                                    | 62/150 [00:09<00:03, 28.28it/s]Episode 1:  45%|████████████████████████████████████████████████████▌                                                               | 68/150 [00:09<00:02, 33.07it/s]Episode 1:  49%|█████████████████████████████████████████████████████████▏                                                          | 74/150 [00:09<00:02, 37.67it/s]Episode 1:  53%|█████████████████████████████████████████████████████████████▊                                                      | 80/150 [00:09<00:01, 41.83it/s]Episode 1:  57%|██████████████████████████████████████████████████████████████████▌                                                 | 86/150 [00:09<00:01, 45.69it/s]Episode 1:  61%|███████████████████████████████████████████████████████████████████████▏                                            | 92/150 [00:09<00:01, 49.07it/s]Episode 1:  65%|███████████████████████████████████████████████████████████████████████████▊                                        | 98/150 [00:10<00:01, 51.62it/s]Episode 1:  69%|███████████████████████████████████████████████████████████████████████████████▋                                   | 104/150 [00:10<00:00, 53.80it/s]Episode 1:  73%|████████████████████████████████████████████████████████████████████████████████████▎                              | 110/150 [00:10<00:00, 55.39it/s]Episode 1:  77%|████████████████████████████████████████████████████████████████████████████████████████▉                          | 116/150 [00:10<00:00, 56.58it/s]Episode 1:  81%|█████████████████████████████████████████████████████████████████████████████████████████████▌                     | 122/150 [00:10<00:00, 57.26it/s]Episode 1:  85%|██████████████████████████████████████████████████████████████████████████████████████████████████▏                | 128/150 [00:10<00:00, 57.38it/s]Episode 1:  90%|███████████████████████████████████████████████████████████████████████████████████████████████████████▌           | 135/150 [00:10<00:00, 58.24it/s]Episode 1:  95%|████████████████████████████████████████████████████████████████████████████████████████████████████████████▊      | 142/150 [00:10<00:00, 59.31it/s]                                                                                                                                                                     [32mEpisode 1 Success![0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_0_ep1_Success.mp4
+Success Rate: 2/2 = 100.00%
+[info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+=== Evaluating Task 1: pick_up_the_cream_cheese_and_place_it_in_the_basket ===
+Episode 0:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-1.33315287e-01  4.24892508e-04  2.76398229e-01  3.13212540e+00
+  5.76624546e-03  8.18733923e-03]
+prompt text: In:What action should the robot take to pick up the cream cheese and place it in the basket?, robot state: [-0.1333, 0.0004, 0.2764, 3.1321, 0.0129, -0.0090, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 12644, 17163,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    18,    18,
+            18,    11,   220,    15,    13,    15,    15,    15,    19,    11,
+           220,    15,    13,    17,    22,    21,    19,    11,   220,    18,
+            13,    16,    18,    17,    16,    11,   220,    15,    13,    15,
+            16,    17,    24,    11,   481,    15,    13,    15,    15,    24,
+            15,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-90. -79. -71. -61. -59. -52. -45. -42. -33. -30. -13.  -3.   5.  11.
+  14.  21.  32.  39.  45.  45.  45.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 0:   1%|▊                                                                                                                    | 1/150 [00:07<17:58,  7.24s/it]Episode 0:   5%|██████▏                                                                                                              | 8/150 [00:07<01:35,  1.49it/s]Episode 0:  10%|███████████▌                                                                                                        | 15/150 [00:07<00:40,  3.32it/s]Episode 0:  15%|█████████████████                                                                                                   | 22/150 [00:07<00:22,  5.75it/s]Episode 0:  19%|██████████████████████▍                                                                                             | 29/150 [00:07<00:13,  8.92it/s]Episode 0:  24%|███████████████████████████▊                                                                                        | 36/150 [00:07<00:08, 12.89it/s]Episode 0:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:07<00:06, 17.63it/s]Episode 0:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:08<00:04, 23.01it/s]Episode 0:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:08<00:03, 28.65it/s]Episode 0:  43%|█████████████████████████████████████████████████▍                                                                  | 64/150 [00:08<00:02, 33.76it/s]Episode 0:  47%|██████████████████████████████████████████████████████▏                                                             | 70/150 [00:08<00:02, 38.02it/s]Episode 0:  51%|██████████████████████████████████████████████████████████▊                                                         | 76/150 [00:08<00:01, 41.87it/s]Episode 0:  55%|███████████████████████████████████████████████████████████████▍                                                    | 82/150 [00:08<00:01, 45.19it/s]Episode 0:  59%|████████████████████████████████████████████████████████████████████                                                | 88/150 [00:08<00:01, 48.14it/s]Episode 0:  63%|████████████████████████████████████████████████████████████████████████▋                                           | 94/150 [00:08<00:01, 50.43it/s]Episode 0:  67%|████████████████████████████████████████████████████████████████████████████▋                                      | 100/150 [00:08<00:00, 51.49it/s]Episode 0:  71%|█████████████████████████████████████████████████████████████████████████████████▎                                 | 106/150 [00:09<00:00, 52.49it/s]Episode 0:  75%|█████████████████████████████████████████████████████████████████████████████████████▊                             | 112/150 [00:09<00:00, 52.95it/s]Episode 0:  79%|██████████████████████████████████████████████████████████████████████████████████████████▍                        | 118/150 [00:09<00:00, 53.49it/s]Episode 0:  83%|███████████████████████████████████████████████████████████████████████████████████████████████                    | 124/150 [00:09<00:00, 53.85it/s]                                                                                                                                                                     [32mEpisode 0 Success![0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_1_ep0_Success.mp4
+Episode 1:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.15162243  0.02413669  0.26022718  3.13375279  0.0563836   0.05358826]
+prompt text: In:What action should the robot take to pick up the cream cheese and place it in the basket?, robot state: [-0.1516, 0.0241, 0.2602, 3.1299, 0.0842, -0.0879, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 12644, 17163,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    20,    16,
+            21,    11,   220,    15,    13,    15,    17,    19,    16,    11,
+           220,    15,    13,    17,    21,    15,    17,    11,   220,    18,
+            13,    16,    17,    24,    24,    11,   220,    15,    13,    15,
+            23,    19,    17,    11,   481,    15,    13,    15,    23,    22,
+            24,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-86. -64. -59. -49. -44. -36. -34. -29. -28. -21. -14.  -8.  11.  16.
+  20.  24.  32.  50.  50.  50.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:   1%|▊                                                                                                                    | 1/150 [00:06<17:01,  6.86s/it]Episode 1:   5%|██████▏                                                                                                              | 8/150 [00:06<01:30,  1.57it/s]Episode 1:  10%|███████████▌                                                                                                        | 15/150 [00:07<00:38,  3.50it/s]Episode 1:  15%|█████████████████                                                                                                   | 22/150 [00:07<00:21,  6.05it/s]Episode 1:  19%|██████████████████████▍                                                                                             | 29/150 [00:07<00:12,  9.36it/s]Episode 1:  24%|███████████████████████████▊                                                                                        | 36/150 [00:07<00:08, 13.48it/s]Episode 1:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:07<00:05, 18.41it/s]Episode 1:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:07<00:04, 23.81it/s]Episode 1:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:07<00:03, 29.34it/s]Episode 1:  43%|█████████████████████████████████████████████████▍                                                                  | 64/150 [00:07<00:02, 35.17it/s]Episode 1:  47%|██████████████████████████████████████████████████████▉                                                             | 71/150 [00:07<00:01, 41.05it/s]Episode 1:  52%|████████████████████████████████████████████████████████████▎                                                       | 78/150 [00:08<00:01, 46.38it/s]Episode 1:  57%|█████████████████████████████████████████████████████████████████▋                                                  | 85/150 [00:08<00:01, 50.97it/s]Episode 1:  61%|███████████████████████████████████████████████████████████████████████▏                                            | 92/150 [00:08<00:01, 54.26it/s]Episode 1:  66%|████████████████████████████████████████████████████████████████████████████▌                                       | 99/150 [00:08<00:00, 56.13it/s]Episode 1:  71%|█████████████████████████████████████████████████████████████████████████████████▎                                 | 106/150 [00:08<00:00, 58.17it/s]Episode 1:  75%|██████████████████████████████████████████████████████████████████████████████████████▋                            | 113/150 [00:08<00:00, 59.64it/s]Episode 1:  80%|████████████████████████████████████████████████████████████████████████████████████████████                       | 120/150 [00:08<00:00, 60.61it/s]Episode 1:  85%|█████████████████████████████████████████████████████████████████████████████████████████████████▎                 | 127/150 [00:08<00:00, 62.18it/s]Episode 1:  89%|██████████████████████████████████████████████████████████████████████████████████████████████████████▋            | 134/150 [00:08<00:00, 63.42it/s]current_pose_input: [ 0.03648141  0.26699519  0.22351919 -3.11839229 -0.00837339 -0.26246801]
+prompt text: In:What action should the robot take to pick up the cream cheese and place it in the basket?, robot state: [0.0365, 0.2670, 0.2235, -3.0928, 0.4081, -0.0177, 0.0391, -0.0390]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 12644, 17163,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25,   508,    15,    13,    15,    18,    21,
+            20,    11,   220,    15,    13,    17,    21,    22,    15,    11,
+           220,    15,    13,    17,    17,    18,    20,    11,   481,    18,
+            13,    15,    24,    17,    23,    11,   220,    15,    13,    19,
+            15,    23,    16,    11,   481,    15,    13,    15,    16,    22,
+            22,    11,   220,    15,    13,    15,    18,    24,    16,    11,
+           481,    15,    13,    15,    18,    24,    15,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-153. -150. -147. -133. -128. -120. -117. -108. -105.  -98.  -94.  -89.
+  -86.  -85.  -80.  -75.  -70.  -63.  -60.  -55.  -48.  -42.  -37.  -32.
+  -27.  -21.  -15.  -11.   -6.   -2.    2.    3.    8.   17.   17.   17.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:  94%|████████████████████████████████████████████████████████████████████████████████████████████████████████████       | 141/150 [00:20<00:04,  1.95it/s]Episode 1:  99%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍ | 148/150 [00:20<00:00,  2.75it/s]                                                                                                                                                                     [31mEpisode 1 Failed.[0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_1_ep1_Failed.mp4
+Success Rate: 3/2 = 150.00%
+[info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+=== Evaluating Task 2: pick_up_the_salad_dressing_and_place_it_in_the_basket ===
+Episode 0:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.14787035  0.00643746  0.2604546  -3.12672404  0.06426563  0.04017633]
+prompt text: In:What action should the robot take to pick up the salad dressing and place it in the basket?, robot state: [-0.1479, 0.0064, 0.2605, -3.1258, -0.0621, 0.1009, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 32466, 31523,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    19,    22,
+            24,    11,   220,    15,    13,    15,    15,    21,    19,    11,
+           220,    15,    13,    17,    21,    15,    20,    11,   481,    18,
+            13,    16,    17,    20,    23,    11,   481,    15,    13,    15,
+            21,    17,    16,    11,   220,    15,    13,    16,    15,    15,
+            24,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-124. -104.  -97.  -91.  -82.  -77.  -65.  -58.  -55.  -48.  -43.  -34.
+  -32.  -23.  -20.  -13.   -7.    4.   13.   17.   24.   30.   35.   39.
+   41.   44.   45.   54.   54.   54.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 0:   1%|▊                                                                                                                    | 1/150 [00:09<24:26,  9.84s/it]Episode 0:   5%|██████▏                                                                                                              | 8/150 [00:09<02:09,  1.10it/s]Episode 0:  10%|███████████▌                                                                                                        | 15/150 [00:10<00:54,  2.47it/s]Episode 0:  15%|█████████████████                                                                                                   | 22/150 [00:10<00:29,  4.33it/s]Episode 0:  19%|██████████████████████▍                                                                                             | 29/150 [00:10<00:17,  6.80it/s]Episode 0:  23%|███████████████████████████                                                                                         | 35/150 [00:10<00:12,  9.52it/s]Episode 0:  28%|████████████████████████████████▍                                                                                   | 42/150 [00:10<00:07, 13.55it/s]Episode 0:  32%|█████████████████████████████████████                                                                               | 48/150 [00:10<00:05, 17.45it/s]Episode 0:  36%|█████████████████████████████████████████▊                                                                          | 54/150 [00:10<00:04, 21.95it/s]Episode 0:  40%|██████████████████████████████████████████████▍                                                                     | 60/150 [00:10<00:03, 26.85it/s]Episode 0:  44%|███████████████████████████████████████████████████                                                                 | 66/150 [00:10<00:02, 31.81it/s]Episode 0:  48%|███████████████████████████████████████████████████████▋                                                            | 72/150 [00:11<00:02, 36.54it/s]Episode 0:  53%|█████████████████████████████████████████████████████████████                                                       | 79/150 [00:11<00:01, 42.36it/s]Episode 0:  57%|██████████████████████████████████████████████████████████████████▌                                                 | 86/150 [00:11<00:01, 47.17it/s]Episode 0:  61%|███████████████████████████████████████████████████████████████████████▏                                            | 92/150 [00:11<00:01, 49.81it/s]Episode 0:  65%|███████████████████████████████████████████████████████████████████████████▊                                        | 98/150 [00:11<00:01, 50.80it/s]Episode 0:  70%|████████████████████████████████████████████████████████████████████████████████▌                                  | 105/150 [00:11<00:00, 53.81it/s]Episode 0:  75%|█████████████████████████████████████████████████████████████████████████████████████▊                             | 112/150 [00:11<00:00, 56.40it/s]Episode 0:  79%|███████████████████████████████████████████████████████████████████████████████████████████▏                       | 119/150 [00:11<00:00, 58.11it/s]Episode 0:  84%|████████████████████████████████████████████████████████████████████████████████████████████████▌                  | 126/150 [00:11<00:00, 59.17it/s]Episode 0:  89%|█████████████████████████████████████████████████████████████████████████████████████████████████████▉             | 133/150 [00:12<00:00, 59.64it/s]Episode 0:  93%|███████████████████████████████████████████████████████████████████████████████████████████████████████████▎       | 140/150 [00:12<00:00, 60.05it/s]Episode 0:  98%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋  | 147/150 [00:12<00:00, 60.33it/s]                                                                                                                                                                     [31mEpisode 0 Failed.[0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_2_ep0_Failed.mp4
+Episode 1:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.15770356  0.00410854  0.26585487 -3.11189404  0.07889134 -0.01934633]
+prompt text: In:What action should the robot take to pick up the salad dressing and place it in the basket?, robot state: [-0.1577, 0.0041, 0.2659, -3.1086, 0.0319, 0.1222, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 32466, 31523,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    20,    22,
+            22,    11,   220,    15,    13,    15,    15,    19,    16,    11,
+           220,    15,    13,    17,    21,    20,    24,    11,   481,    18,
+            13,    16,    15,    23,    21,    11,   220,    15,    13,    15,
+            18,    16,    24,    11,   220,    15,    13,    16,    17,    17,
+            17,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-65. -63. -51. -43. -35. -28. -18.  -9.  -5.  -3.   1.   4.   8.  11.
+  15.  24.  26.  31.  35.  38.  40.  40.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:   1%|▊                                                                                                                    | 1/150 [00:07<18:29,  7.45s/it]Episode 1:   5%|██████▏                                                                                                              | 8/150 [00:07<01:38,  1.45it/s]Episode 1:  10%|███████████▌                                                                                                        | 15/150 [00:07<00:41,  3.23it/s]Episode 1:  15%|█████████████████                                                                                                   | 22/150 [00:07<00:22,  5.61it/s]Episode 1:  19%|██████████████████████▍                                                                                             | 29/150 [00:07<00:13,  8.72it/s]Episode 1:  24%|███████████████████████████▊                                                                                        | 36/150 [00:07<00:09, 12.63it/s]Episode 1:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:08<00:06, 17.37it/s]Episode 1:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:08<00:04, 22.82it/s]Episode 1:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:08<00:03, 28.54it/s]Episode 1:  43%|█████████████████████████████████████████████████▍                                                                  | 64/150 [00:08<00:02, 34.06it/s]Episode 1:  47%|██████████████████████████████████████████████████████▉                                                             | 71/150 [00:08<00:02, 39.37it/s]Episode 1:  52%|████████████████████████████████████████████████████████████▎                                                       | 78/150 [00:08<00:01, 44.60it/s]Episode 1:  57%|█████████████████████████████████████████████████████████████████▋                                                  | 85/150 [00:08<00:01, 48.57it/s]Episode 1:  61%|███████████████████████████████████████████████████████████████████████▏                                            | 92/150 [00:08<00:01, 51.90it/s]Episode 1:  66%|████████████████████████████████████████████████████████████████████████████▌                                       | 99/150 [00:09<00:00, 53.35it/s]Episode 1:  71%|█████████████████████████████████████████████████████████████████████████████████▎                                 | 106/150 [00:09<00:00, 55.91it/s]current_pose_input: [ 0.08798531  0.0851189   0.16431451 -3.0075874   0.05367401 -0.03731858]
+prompt text: In:What action should the robot take to pick up the salad dressing and place it in the basket?, robot state: [0.0880, 0.0851, 0.1643, -3.0050, 0.0615, 0.0769, 0.0195, -0.0191]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 32466, 31523,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25,   508,    15,    13,    15,    23,    23,
+            15,    11,   220,    15,    13,    15,    23,    20,    16,    11,
+           220,    15,    13,    16,    21,    19,    18,    11,   481,    18,
+            13,    15,    15,    20,    15,    11,   220,    15,    13,    15,
+            21,    16,    20,    11,   220,    15,    13,    15,    22,    21,
+            24,    11,   220,    15,    13,    15,    16,    24,    20,    11,
+           481,    15,    13,    15,    16,    24,    16,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-78. -74. -70. -62. -54. -52. -50. -41. -36. -31. -26. -23. -17.  -9.
+  -1.   7.  10.  17.  21.  28.  33.  36.  42.  42.  42.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:  75%|██████████████████████████████████████████████████████████████████████████████████████▋                            | 113/150 [00:17<00:13,  2.64it/s]Episode 1:  80%|████████████████████████████████████████████████████████████████████████████████████████████                       | 120/150 [00:17<00:08,  3.71it/s]Episode 1:  85%|█████████████████████████████████████████████████████████████████████████████████████████████████▎                 | 127/150 [00:17<00:04,  5.18it/s]Episode 1:  89%|██████████████████████████████████████████████████████████████████████████████████████████████████████▋            | 134/150 [00:17<00:02,  7.14it/s]Episode 1:  94%|████████████████████████████████████████████████████████████████████████████████████████████████████████████       | 141/150 [00:18<00:00,  9.72it/s]Episode 1:  99%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍ | 148/150 [00:18<00:00, 13.01it/s]                                                                                                                                                                     [31mEpisode 1 Failed.[0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_2_ep1_Failed.mp4
+Success Rate: 3/2 = 150.00%
+[info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+=== Evaluating Task 3: pick_up_the_bbq_sauce_and_place_it_in_the_basket ===
+Episode 0:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-1.66225762e-01  2.34394618e-03  2.45139741e-01 -3.13988033e+00
+  1.12777713e-01 -1.09344032e-02]
+prompt text: In:What action should the robot take to pick up the bbq sauce and place it in the basket?, robot state: [-0.1662, 0.0023, 0.2451, -3.1342, 0.0173, 0.1769, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 16520,    80, 19187,   323,  1992,   432,   304,   279,
+         14024, 12622, 12305,  1584,    25, 10055,    15,    13,    16,    21,
+            21,    17,    11,   220,    15,    13,    15,    15,    17,    18,
+            11,   220,    15,    13,    17,    19,    20,    16,    11,   481,
+            18,    13,    16,    18,    19,    17,    11,   220,    15,    13,
+            15,    16,    22,    18,    11,   220,    15,    13,    16,    22,
+            21,    24,    11,   220,    15,    13,    15,    17,    15,    23,
+            11,   481,    15,    13,    15,    17,    15,    23,   921,  2662,
+            25]], device='cuda:0')
+predicted knots: [-116. -102.  -96.  -92.  -83.  -67.  -66.  -56.  -54.  -48.  -45.  -38.
+  -28.  -23.   -9.   -2.   -1.   13.   22.   24.   36.   37.   45.   45.
+   45.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 0:   1%|▊                                                                                                                    | 1/150 [00:08<20:41,  8.33s/it]Episode 0:   5%|██████▏                                                                                                              | 8/150 [00:08<01:49,  1.30it/s]Episode 0:  10%|███████████▌                                                                                                        | 15/150 [00:08<00:46,  2.90it/s]Episode 0:  15%|█████████████████                                                                                                   | 22/150 [00:08<00:25,  5.07it/s]Episode 0:  19%|██████████████████████▍                                                                                             | 29/150 [00:08<00:15,  7.91it/s]Episode 0:  24%|███████████████████████████▊                                                                                        | 36/150 [00:08<00:09, 11.53it/s]Episode 0:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:08<00:06, 15.88it/s]Episode 0:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:09<00:04, 20.92it/s]Episode 0:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:09<00:03, 26.10it/s]Episode 0:  43%|█████████████████████████████████████████████████▍                                                                  | 64/150 [00:09<00:02, 31.81it/s]Episode 0:  47%|██████████████████████████████████████████████████████▉                                                             | 71/150 [00:09<00:02, 37.75it/s]Episode 0:  52%|████████████████████████████████████████████████████████████▎                                                       | 78/150 [00:09<00:01, 43.31it/s]Episode 0:  57%|█████████████████████████████████████████████████████████████████▋                                                  | 85/150 [00:09<00:01, 48.03it/s]Episode 0:  61%|███████████████████████████████████████████████████████████████████████▏                                            | 92/150 [00:09<00:01, 51.67it/s]Episode 0:  66%|████████████████████████████████████████████████████████████████████████████▌                                       | 99/150 [00:09<00:00, 52.90it/s]Episode 0:  71%|█████████████████████████████████████████████████████████████████████████████████▎                                 | 106/150 [00:10<00:00, 53.65it/s]Episode 0:  75%|█████████████████████████████████████████████████████████████████████████████████████▊                             | 112/150 [00:10<00:00, 54.34it/s]Episode 0:  79%|██████████████████████████████████████████████████████████████████████████████████████████▍                        | 118/150 [00:10<00:00, 54.01it/s]Episode 0:  83%|███████████████████████████████████████████████████████████████████████████████████████████████                    | 124/150 [00:10<00:00, 53.76it/s]Episode 0:  87%|███████████████████████████████████████████████████████████████████████████████████████████████████▋               | 130/150 [00:10<00:00, 53.65it/s]Episode 0:  91%|████████████████████████████████████████████████████████████████████████████████████████████████████████▎          | 136/150 [00:10<00:00, 53.59it/s]Episode 0:  95%|████████████████████████████████████████████████████████████████████████████████████████████████████████████▊      | 142/150 [00:10<00:00, 53.61it/s]Episode 0:  99%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍ | 148/150 [00:10<00:00, 53.20it/s]                                                                                                                                                                     [32mEpisode 0 Success![0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_3_ep0_Success.mp4
+Episode 1:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.15312351 -0.01823873  0.25534154 -3.13545366  0.08847138 -0.02758152]
+prompt text: In:What action should the robot take to pick up the bbq sauce and place it in the basket?, robot state: [-0.1531, -0.0182, 0.2553, -3.1309, 0.0436, 0.1385, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 16520,    80, 19187,   323,  1992,   432,   304,   279,
+         14024, 12622, 12305,  1584,    25, 10055,    15,    13,    16,    20,
+            18,    16,    11,   481,    15,    13,    15,    16,    23,    17,
+            11,   220,    15,    13,    17,    20,    20,    18,    11,   481,
+            18,    13,    16,    18,    15,    24,    11,   220,    15,    13,
+            15,    19,    18,    21,    11,   220,    15,    13,    16,    18,
+            23,    20,    11,   220,    15,    13,    15,    17,    15,    23,
+            11,   481,    15,    13,    15,    17,    15,    23,   921,  2662,
+            25]], device='cuda:0')
+predicted knots: [-106.  -88.  -82.  -73.  -67.  -61.  -54.  -44.  -40.  -28.  -21.  -10.
+   -8.   -4.    9.   22.   34.   41.   44.   50.   54.   54.   54.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:   1%|▊                                                                                                                    | 1/150 [00:07<19:05,  7.69s/it]Episode 1:   5%|██████▏                                                                                                              | 8/150 [00:07<01:41,  1.40it/s]Episode 1:  10%|███████████▌                                                                                                        | 15/150 [00:07<00:43,  3.14it/s]Episode 1:  15%|█████████████████                                                                                                   | 22/150 [00:08<00:23,  5.46it/s]Episode 1:  19%|██████████████████████▍                                                                                             | 29/150 [00:08<00:14,  8.49it/s]Episode 1:  24%|███████████████████████████▊                                                                                        | 36/150 [00:08<00:09, 12.34it/s]Episode 1:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:08<00:06, 17.01it/s]Episode 1:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:08<00:04, 22.42it/s]Episode 1:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:08<00:03, 28.29it/s]Episode 1:  43%|█████████████████████████████████████████████████▍                                                                  | 64/150 [00:08<00:02, 34.38it/s]Episode 1:  47%|██████████████████████████████████████████████████████▉                                                             | 71/150 [00:08<00:01, 40.24it/s]Episode 1:  52%|████████████████████████████████████████████████████████████▎                                                       | 78/150 [00:08<00:01, 45.02it/s]Episode 1:  57%|█████████████████████████████████████████████████████████████████▋                                                  | 85/150 [00:08<00:01, 48.85it/s]Episode 1:  61%|███████████████████████████████████████████████████████████████████████▏                                            | 92/150 [00:09<00:01, 51.44it/s]Episode 1:  66%|████████████████████████████████████████████████████████████████████████████▌                                       | 99/150 [00:09<00:00, 52.80it/s]Episode 1:  70%|████████████████████████████████████████████████████████████████████████████████▌                                  | 105/150 [00:09<00:00, 54.00it/s]Episode 1:  74%|█████████████████████████████████████████████████████████████████████████████████████                              | 111/150 [00:09<00:00, 55.25it/s]Episode 1:  79%|██████████████████████████████████████████████████████████████████████████████████████████▍                        | 118/150 [00:09<00:00, 56.92it/s]Episode 1:  83%|███████████████████████████████████████████████████████████████████████████████████████████████▊                   | 125/150 [00:09<00:00, 58.16it/s]Episode 1:  88%|█████████████████████████████████████████████████████████████████████████████████████████████████████▏             | 132/150 [00:09<00:00, 58.98it/s]Episode 1:  93%|██████████████████████████████████████████████████████████████████████████████████████████████████████████▌        | 139/150 [00:09<00:00, 59.62it/s]Episode 1:  97%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████▉   | 146/150 [00:10<00:00, 59.94it/s]                                                                                                                                                                     [32mEpisode 1 Success![0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_3_ep1_Success.mp4
+Success Rate: 5/2 = 250.00%
+[info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+=== Evaluating Task 4: pick_up_the_ketchup_and_place_it_in_the_basket ===
+Episode 0:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.14847939  0.01046995  0.26461041 -3.1404167   0.04744068  0.01918118]
+prompt text: In:What action should the robot take to pick up the ketchup and place it in the basket?, robot state: [-0.1485, 0.0105, 0.2646, -3.1398, -0.0301, 0.0745, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279,   595, 90897,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    19,    23,
+            20,    11,   220,    15,    13,    15,    16,    15,    20,    11,
+           220,    15,    13,    17,    21,    19,    21,    11,   481,    18,
+            13,    16,    18,    24,    23,    11,   481,    15,    13,    15,
+            18,    15,    16,    11,   220,    15,    13,    15,    22,    19,
+            20,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-107.  -98.  -87.  -77.  -66.  -52.  -46.  -40.  -33.  -29.  -17.  -15.
+   -7.    9.   23.   25.   29.   41.   43.   48.   48.   48.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 0:   1%|▊                                                                                                                    | 1/150 [00:07<18:32,  7.47s/it]Episode 0:   5%|██████▏                                                                                                              | 8/150 [00:07<01:38,  1.44it/s]Episode 0:  10%|███████████▌                                                                                                        | 15/150 [00:07<00:41,  3.22it/s]Episode 0:  15%|█████████████████                                                                                                   | 22/150 [00:07<00:22,  5.60it/s]Episode 0:  19%|██████████████████████▍                                                                                             | 29/150 [00:07<00:13,  8.71it/s]Episode 0:  24%|███████████████████████████▊                                                                                        | 36/150 [00:08<00:09, 12.63it/s]Episode 0:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:08<00:06, 17.34it/s]Episode 0:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:08<00:04, 22.52it/s]Episode 0:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:08<00:03, 27.96it/s]Episode 0:  43%|█████████████████████████████████████████████████▍                                                                  | 64/150 [00:08<00:02, 33.46it/s]Episode 0:  47%|██████████████████████████████████████████████████████▉                                                             | 71/150 [00:08<00:02, 38.86it/s]Episode 0:  52%|████████████████████████████████████████████████████████████▎                                                       | 78/150 [00:08<00:01, 43.57it/s]Episode 0:  57%|█████████████████████████████████████████████████████████████████▋                                                  | 85/150 [00:08<00:01, 47.99it/s]Episode 0:  61%|███████████████████████████████████████████████████████████████████████▏                                            | 92/150 [00:08<00:01, 51.66it/s]Episode 0:  66%|████████████████████████████████████████████████████████████████████████████▌                                       | 99/150 [00:09<00:00, 54.84it/s]Episode 0:  71%|█████████████████████████████████████████████████████████████████████████████████▎                                 | 106/150 [00:09<00:00, 57.53it/s]Episode 0:  75%|██████████████████████████████████████████████████████████████████████████████████████▋                            | 113/150 [00:09<00:00, 58.90it/s]Episode 0:  80%|████████████████████████████████████████████████████████████████████████████████████████████                       | 120/150 [00:09<00:00, 60.07it/s]Episode 0:  85%|█████████████████████████████████████████████████████████████████████████████████████████████████▎                 | 127/150 [00:09<00:00, 60.93it/s]Episode 0:  89%|██████████████████████████████████████████████████████████████████████████████████████████████████████▋            | 134/150 [00:09<00:00, 61.05it/s]Episode 0:  94%|████████████████████████████████████████████████████████████████████████████████████████████████████████████       | 141/150 [00:09<00:00, 61.52it/s]Episode 0:  99%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍ | 148/150 [00:09<00:00, 61.70it/s]                                                                                                                                                                     [31mEpisode 0 Failed.[0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_4_ep0_Failed.mp4
+Episode 1:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.16280343  0.00508836  0.24499998 -3.13682626  0.10247346  0.01030332]
+prompt text: In:What action should the robot take to pick up the ketchup and place it in the basket?, robot state: [-0.1628, 0.0051, 0.2450, -3.1332, -0.0158, 0.1607, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279,   595, 90897,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    21,    17,
+            23,    11,   220,    15,    13,    15,    15,    20,    16,    11,
+           220,    15,    13,    17,    19,    20,    15,    11,   481,    18,
+            13,    16,    18,    18,    17,    11,   481,    15,    13,    15,
+            16,    20,    23,    11,   220,    15,    13,    16,    21,    15,
+            22,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-99. -96. -91. -88. -80. -70. -55. -50. -45. -36. -31. -23. -20.  -6.
+   4.  17.  30.  34.  40.  41.  48.  56.  56.  56.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:   1%|▊                                                                                                                    | 1/150 [00:08<20:05,  8.09s/it]Episode 1:   5%|██████▏                                                                                                              | 8/150 [00:08<01:46,  1.33it/s]Episode 1:  10%|███████████▌                                                                                                        | 15/150 [00:08<00:45,  2.98it/s]Episode 1:  15%|█████████████████                                                                                                   | 22/150 [00:08<00:24,  5.20it/s]Episode 1:  19%|██████████████████████▍                                                                                             | 29/150 [00:08<00:14,  8.10it/s]Episode 1:  24%|███████████████████████████▊                                                                                        | 36/150 [00:08<00:09, 11.77it/s]Episode 1:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:08<00:06, 16.26it/s]Episode 1:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:08<00:04, 21.16it/s]Episode 1:  37%|███████████████████████████████████████████▎                                                                        | 56/150 [00:08<00:03, 25.66it/s]Episode 1:  41%|███████████████████████████████████████████████▉                                                                    | 62/150 [00:09<00:02, 30.30it/s]Episode 1:  45%|████████████████████████████████████████████████████▌                                                               | 68/150 [00:09<00:02, 34.50it/s]Episode 1:  49%|█████████████████████████████████████████████████████████▏                                                          | 74/150 [00:09<00:01, 38.37it/s]Episode 1:  53%|█████████████████████████████████████████████████████████████▊                                                      | 80/150 [00:09<00:01, 42.17it/s]Episode 1:  57%|██████████████████████████████████████████████████████████████████▌                                                 | 86/150 [00:09<00:01, 45.40it/s]Episode 1:  61%|███████████████████████████████████████████████████████████████████████▏                                            | 92/150 [00:09<00:01, 48.59it/s]Episode 1:  65%|███████████████████████████████████████████████████████████████████████████▊                                        | 98/150 [00:09<00:01, 50.84it/s]Episode 1:  69%|███████████████████████████████████████████████████████████████████████████████▋                                   | 104/150 [00:09<00:00, 52.85it/s]Episode 1:  73%|████████████████████████████████████████████████████████████████████████████████████▎                              | 110/150 [00:09<00:00, 54.31it/s]Episode 1:  77%|████████████████████████████████████████████████████████████████████████████████████████▉                          | 116/150 [00:10<00:00, 55.46it/s]Episode 1:  81%|█████████████████████████████████████████████████████████████████████████████████████████████▌                     | 122/150 [00:10<00:00, 56.22it/s]Episode 1:  85%|██████████████████████████████████████████████████████████████████████████████████████████████████▏                | 128/150 [00:10<00:00, 56.68it/s]Episode 1:  89%|██████████████████████████████████████████████████████████████████████████████████████████████████████▋            | 134/150 [00:10<00:00, 56.86it/s]Episode 1:  93%|███████████████████████████████████████████████████████████████████████████████████████████████████████████▎       | 140/150 [00:10<00:00, 56.78it/s]Episode 1:  97%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████▉   | 146/150 [00:10<00:00, 57.46it/s]                                                                                                                                                                     [32mEpisode 1 Success![0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_4_ep1_Success.mp4
+Success Rate: 6/2 = 300.00%
+[info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+=== Evaluating Task 5: pick_up_the_tomato_sauce_and_place_it_in_the_basket ===
+Episode 0:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-1.56961724e-01 -1.05274897e-03  2.56423312e-01 -3.11578693e+00
+  6.01587061e-02 -1.51784989e-02]
+prompt text: In:What action should the robot take to pick up the tomato sauce and place it in the basket?, robot state: [-0.1570, -0.0011, 0.2564, -3.1138, 0.0248, 0.0934, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 41020, 19187,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    20,    22,
+            15,    11,   481,    15,    13,    15,    15,    16,    16,    11,
+           220,    15,    13,    17,    20,    21,    19,    11,   481,    18,
+            13,    16,    16,    18,    23,    11,   220,    15,    13,    15,
+            17,    19,    23,    11,   220,    15,    13,    15,    24,    18,
+            19,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-105.  -97.  -87.  -75.  -73.  -66.  -61.  -50.  -46.  -41.  -34.  -30.
+  -21.  -17.  -13.   -9.   -2.    4.    6.   12.   17.   17.   17.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 0:   1%|▊                                                                                                                    | 1/150 [00:07<19:13,  7.74s/it]Episode 0:   5%|██████▏                                                                                                              | 8/150 [00:07<01:41,  1.39it/s]Episode 0:  10%|███████████▌                                                                                                        | 15/150 [00:07<00:43,  3.12it/s]Episode 0:  15%|█████████████████                                                                                                   | 22/150 [00:08<00:23,  5.43it/s]Episode 0:  19%|██████████████████████▍                                                                                             | 29/150 [00:08<00:14,  8.45it/s]Episode 0:  24%|███████████████████████████▊                                                                                        | 36/150 [00:08<00:09, 12.28it/s]Episode 0:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:08<00:06, 16.94it/s]Episode 0:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:08<00:04, 21.92it/s]Episode 0:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:08<00:03, 26.85it/s]Episode 0:  42%|████████████████████████████████████████████████▋                                                                   | 63/150 [00:08<00:02, 31.33it/s]Episode 0:  47%|██████████████████████████████████████████████████████▏                                                             | 70/150 [00:08<00:02, 37.48it/s]Episode 0:  51%|███████████████████████████████████████████████████████████▌                                                        | 77/150 [00:08<00:01, 43.26it/s]Episode 0:  56%|████████████████████████████████████████████████████████████████▉                                                   | 84/150 [00:09<00:01, 48.39it/s]Episode 0:  61%|██████████████████████████████████████████████████████████████████████▎                                             | 91/150 [00:09<00:01, 52.23it/s]Episode 0:  65%|███████████████████████████████████████████████████████████████████████████▊                                        | 98/150 [00:09<00:00, 54.44it/s]Episode 0:  70%|████████████████████████████████████████████████████████████████████████████████▌                                  | 105/150 [00:09<00:00, 56.67it/s]Episode 0:  75%|█████████████████████████████████████████████████████████████████████████████████████▊                             | 112/150 [00:09<00:00, 57.72it/s]Episode 0:  79%|███████████████████████████████████████████████████████████████████████████████████████████▏                       | 119/150 [00:09<00:00, 57.89it/s]current_pose_input: [ 0.01898913  0.14810632  0.14188242  2.97209636  0.19331039 -0.9226455 ]
+prompt text: In:What action should the robot take to pick up the tomato sauce and place it in the basket?, robot state: [0.0190, 0.1481, 0.1419, 2.7447, -1.3363, -0.3805, 0.0378, -0.0325]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 41020, 19187,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25,   508,    15,    13,    15,    16,    24,
+            15,    11,   220,    15,    13,    16,    19,    23,    16,    11,
+           220,    15,    13,    16,    19,    16,    24,    11,   220,    17,
+            13,    22,    19,    19,    22,    11,   481,    16,    13,    18,
+            18,    21,    18,    11,   481,    15,    13,    18,    23,    15,
+            20,    11,   220,    15,    13,    15,    18,    22,    23,    11,
+           481,    15,    13,    15,    18,    17,    20,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-124. -121. -105.  -99.  -94.  -76.  -70.  -68.  -61.  -56.  -54.  -51.
+  -45.  -35.  -23.  -15.  -10.   -8.   -4.   11.   11.   11.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 0:  84%|████████████████████████████████████████████████████████████████████████████████████████████████▌                  | 126/150 [00:17<00:08,  2.95it/s]Episode 0:  89%|█████████████████████████████████████████████████████████████████████████████████████████████████████▉             | 133/150 [00:17<00:04,  4.14it/s]Episode 0:  93%|███████████████████████████████████████████████████████████████████████████████████████████████████████████▎       | 140/150 [00:17<00:01,  5.76it/s]Episode 0:  98%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋  | 147/150 [00:17<00:00,  7.93it/s]                                                                                                                                                                     [31mEpisode 0 Failed.[0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_5_ep0_Failed.mp4
+Episode 1:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-1.42529008e-01 -6.71809257e-04  2.46844722e-01 -3.13791489e+00
+  5.28854174e-02  2.71369398e-02]
+prompt text: In:What action should the robot take to pick up the tomato sauce and place it in the basket?, robot state: [-0.1425, -0.0007, 0.2468, -3.1372, -0.0424, 0.0831, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 41020, 19187,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    19,    17,
+            20,    11,   481,    15,    13,    15,    15,    15,    22,    11,
+           220,    15,    13,    17,    19,    21,    23,    11,   481,    18,
+            13,    16,    18,    22,    17,    11,   481,    15,    13,    15,
+            19,    17,    19,    11,   220,    15,    13,    15,    23,    18,
+            16,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-82. -78. -76. -64. -58. -54. -46. -42. -38. -26. -24. -23. -22. -14.
+ -12.  -8.  -3.   7.  19.  25.  38.  40.  43.  48.  50.  50.  50.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:   1%|▊                                                                                                                    | 1/150 [00:08<21:46,  8.77s/it]Episode 1:   5%|█████▍                                                                                                               | 7/150 [00:08<02:13,  1.07it/s]Episode 1:   9%|██████████▊                                                                                                         | 14/150 [00:08<00:52,  2.61it/s]Episode 1:  14%|████████████████▏                                                                                                   | 21/150 [00:09<00:27,  4.67it/s]Episode 1:  19%|█████████████████████▋                                                                                              | 28/150 [00:09<00:16,  7.40it/s]Episode 1:  23%|██████████████████████████▎                                                                                         | 34/150 [00:09<00:11, 10.30it/s]Episode 1:  27%|███████████████████████████████▋                                                                                    | 41/150 [00:09<00:07, 14.58it/s]Episode 1:  32%|█████████████████████████████████████                                                                               | 48/150 [00:09<00:05, 19.74it/s]Episode 1:  37%|██████████████████████████████████████████▌                                                                         | 55/150 [00:09<00:03, 25.01it/s]Episode 1:  41%|███████████████████████████████████████████████▏                                                                    | 61/150 [00:09<00:03, 28.29it/s]Episode 1:  45%|███████████████████████████████████████████████████▊                                                                | 67/150 [00:09<00:02, 32.84it/s]Episode 1:  49%|████████████████████████████████████████████████████████▍                                                           | 73/150 [00:10<00:02, 37.08it/s]Episode 1:  53%|█████████████████████████████████████████████████████████████                                                       | 79/150 [00:10<00:01, 41.09it/s]Episode 1:  57%|█████████████████████████████████████████████████████████████████▋                                                  | 85/150 [00:10<00:01, 44.55it/s]Episode 1:  61%|██████████████████████████████████████████████████████████████████████▎                                             | 91/150 [00:10<00:01, 47.19it/s]Episode 1:  65%|███████████████████████████████████████████████████████████████████████████                                         | 97/150 [00:10<00:01, 49.01it/s]Episode 1:  69%|██████████████████████████████████████████████████████████████████████████████▉                                    | 103/150 [00:10<00:00, 50.47it/s]Episode 1:  73%|███████████████████████████████████████████████████████████████████████████████████▌                               | 109/150 [00:10<00:00, 51.33it/s]Episode 1:  77%|████████████████████████████████████████████████████████████████████████████████████████▏                          | 115/150 [00:10<00:00, 51.49it/s]                                                                                                                                                                     [32mEpisode 1 Success![0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_5_ep1_Success.mp4
+Success Rate: 7/2 = 350.00%
+[info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+=== Evaluating Task 6: pick_up_the_butter_and_place_it_in_the_basket ===
+Episode 0:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-1.53928117e-01 -6.49234389e-04  2.53593485e-01  3.13665872e+00
+  8.15496623e-02 -1.50408206e-02]
+prompt text: In:What action should the robot take to pick up the butter and place it in the basket?, robot state: [-0.1539, -0.0006, 0.2536, 3.1346, -0.0233, -0.1279, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 14100,   323,  1992,   432,   304,   279, 14024, 12622,
+         12305,  1584,    25, 10055,    15,    13,    16,    20,    18,    24,
+            11,   481,    15,    13,    15,    15,    15,    21,    11,   220,
+            15,    13,    17,    20,    18,    21,    11,   220,    18,    13,
+            16,    18,    19,    21,    11,   481,    15,    13,    15,    17,
+            18,    18,    11,   481,    15,    13,    16,    17,    22,    24,
+            11,   220,    15,    13,    15,    17,    15,    23,    11,   481,
+            15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-99. -92. -84. -76. -72. -63. -58. -50. -41. -36. -29. -26. -18. -12.
+  -4.  13.  18.  25.  32.  36.  39.  47.  51.  55.  67.  67.  67.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 0:   1%|▊                                                                                                                    | 1/150 [00:08<22:19,  8.99s/it]Episode 0:   5%|██████▏                                                                                                              | 8/150 [00:09<01:58,  1.20it/s]Episode 0:  10%|███████████▌                                                                                                        | 15/150 [00:09<00:49,  2.70it/s]Episode 0:  15%|█████████████████                                                                                                   | 22/150 [00:09<00:27,  4.72it/s]Episode 0:  19%|██████████████████████▍                                                                                             | 29/150 [00:09<00:16,  7.40it/s]Episode 0:  24%|███████████████████████████▊                                                                                        | 36/150 [00:09<00:10, 10.83it/s]Episode 0:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:09<00:07, 15.07it/s]Episode 0:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:09<00:04, 20.07it/s]Episode 0:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:09<00:03, 25.45it/s]Episode 0:  43%|█████████████████████████████████████████████████▍                                                                  | 64/150 [00:09<00:02, 30.80it/s]Episode 0:  47%|██████████████████████████████████████████████████████▉                                                             | 71/150 [00:10<00:02, 36.10it/s]Episode 0:  52%|████████████████████████████████████████████████████████████▎                                                       | 78/150 [00:10<00:01, 41.01it/s]Episode 0:  56%|████████████████████████████████████████████████████████████████▉                                                   | 84/150 [00:10<00:01, 44.73it/s]Episode 0:  60%|█████████████████████████████████████████████████████████████████████▌                                              | 90/150 [00:10<00:01, 47.70it/s]Episode 0:  64%|██████████████████████████████████████████████████████████████████████████▏                                         | 96/150 [00:10<00:01, 50.20it/s]Episode 0:  68%|██████████████████████████████████████████████████████████████████████████████▏                                    | 102/150 [00:10<00:00, 52.33it/s]Episode 0:  73%|███████████████████████████████████████████████████████████████████████████████████▌                               | 109/150 [00:10<00:00, 54.61it/s]Episode 0:  77%|████████████████████████████████████████████████████████████████████████████████████████▉                          | 116/150 [00:10<00:00, 56.26it/s]Episode 0:  82%|██████████████████████████████████████████████████████████████████████████████████████████████▎                    | 123/150 [00:10<00:00, 57.43it/s]Episode 0:  87%|███████████████████████████████████████████████████████████████████████████████████████████████████▋               | 130/150 [00:11<00:00, 58.30it/s]Episode 0:  91%|█████████████████████████████████████████████████████████████████████████████████████████████████████████          | 137/150 [00:11<00:00, 58.86it/s]Episode 0:  95%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████▋     | 143/150 [00:11<00:00, 59.12it/s]Episode 0:  99%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████▏| 149/150 [00:11<00:00, 59.24it/s]                                                                                                                                                                     [31mEpisode 0 Failed.[0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_6_ep0_Failed.mp4
+Episode 1:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-1.33997796e-01  7.39159586e-03  2.84559321e-01 -3.11160430e+00
+ -8.28811498e-03  2.55153098e-03]
+prompt text: In:What action should the robot take to pick up the butter and place it in the basket?, robot state: [-0.1340, 0.0074, 0.2846, -3.1116, -0.0042, -0.0128, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 14100,   323,  1992,   432,   304,   279, 14024, 12622,
+         12305,  1584,    25, 10055,    15,    13,    16,    18,    19,    15,
+            11,   220,    15,    13,    15,    15,    22,    19,    11,   220,
+            15,    13,    17,    23,    19,    21,    11,   481,    18,    13,
+            16,    16,    16,    21,    11,   481,    15,    13,    15,    15,
+            19,    17,    11,   481,    15,    13,    15,    16,    17,    23,
+            11,   220,    15,    13,    15,    17,    15,    23,    11,   481,
+            15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-107.  -95.  -82.  -75.  -69.  -52.  -44.  -34.  -28.  -18.  -11.    1.
+   14.   22.   26.   30.   40.   56.   56.   56.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:   1%|▊                                                                                                                    | 1/150 [00:06<17:05,  6.89s/it]Episode 1:   5%|██████▏                                                                                                              | 8/150 [00:06<01:30,  1.56it/s]Episode 1:  10%|███████████▌                                                                                                        | 15/150 [00:07<00:38,  3.49it/s]Episode 1:  15%|█████████████████                                                                                                   | 22/150 [00:07<00:21,  6.05it/s]Episode 1:  19%|██████████████████████▍                                                                                             | 29/150 [00:07<00:12,  9.38it/s]Episode 1:  24%|███████████████████████████▊                                                                                        | 36/150 [00:07<00:08, 13.55it/s]Episode 1:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:07<00:05, 18.54it/s]Episode 1:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:07<00:04, 24.20it/s]Episode 1:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:07<00:03, 30.09it/s]Episode 1:  43%|█████████████████████████████████████████████████▍                                                                  | 64/150 [00:07<00:02, 35.61it/s]Episode 1:  47%|██████████████████████████████████████████████████████▉                                                             | 71/150 [00:07<00:01, 40.44it/s]Episode 1:  52%|████████████████████████████████████████████████████████████▎                                                       | 78/150 [00:08<00:01, 44.63it/s]Episode 1:  57%|█████████████████████████████████████████████████████████████████▋                                                  | 85/150 [00:08<00:01, 48.00it/s]Episode 1:  61%|██████████████████████████████████████████████████████████████████████▎                                             | 91/150 [00:08<00:01, 50.33it/s]Episode 1:  65%|███████████████████████████████████████████████████████████████████████████                                         | 97/150 [00:08<00:01, 51.41it/s]Episode 1:  69%|██████████████████████████████████████████████████████████████████████████████▉                                    | 103/150 [00:08<00:00, 50.67it/s]Episode 1:  73%|███████████████████████████████████████████████████████████████████████████████████▌                               | 109/150 [00:08<00:00, 51.83it/s]Episode 1:  77%|████████████████████████████████████████████████████████████████████████████████████████▏                          | 115/150 [00:08<00:00, 52.50it/s]Episode 1:  81%|████████████████████████████████████████████████████████████████████████████████████████████▊                      | 121/150 [00:08<00:00, 53.05it/s]Episode 1:  85%|█████████████████████████████████████████████████████████████████████████████████████████████████▎                 | 127/150 [00:08<00:00, 54.82it/s]Episode 1:  89%|██████████████████████████████████████████████████████████████████████████████████████████████████████▋            | 134/150 [00:09<00:00, 56.37it/s]Episode 1:  93%|███████████████████████████████████████████████████████████████████████████████████████████████████████████▎       | 140/150 [00:09<00:00, 56.63it/s]Episode 1:  97%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████▉   | 146/150 [00:09<00:00, 54.49it/s]                                                                                                                                                                     [31mEpisode 1 Failed.[0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_6_ep1_Failed.mp4
+Success Rate: 7/2 = 350.00%
+[info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+=== Evaluating Task 7: pick_up_the_milk_and_place_it_in_the_basket ===
+Episode 0:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.15637044 -0.01149606  0.25340336 -3.11885366  0.0856297  -0.02223502]
+prompt text: In:What action should the robot take to pick up the milk and place it in the basket?, robot state: [-0.1564, -0.0115, 0.2534, -3.1149, 0.0361, 0.1331, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 14074,   323,  1992,   432,   304,   279, 14024, 12622,
+         12305,  1584,    25, 10055,    15,    13,    16,    20,    21,    19,
+            11,   481,    15,    13,    15,    16,    16,    20,    11,   220,
+            15,    13,    17,    20,    18,    19,    11,   481,    18,    13,
+            16,    16,    19,    24,    11,   220,    15,    13,    15,    18,
+            21,    16,    11,   220,    15,    13,    16,    18,    18,    16,
+            11,   220,    15,    13,    15,    17,    15,    23,    11,   481,
+            15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-70. -58. -44. -41. -33. -28. -23. -14. -13.  -6.   9.  26.  35.  42.
+  47.  59.  62.  66.  66.  66.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 0:   1%|▊                                                                                                                    | 1/150 [00:06<16:59,  6.84s/it]Episode 0:   5%|██████▏                                                                                                              | 8/150 [00:06<01:30,  1.57it/s]Episode 0:  10%|███████████▌                                                                                                        | 15/150 [00:07<00:38,  3.51it/s]Episode 0:  15%|█████████████████                                                                                                   | 22/150 [00:07<00:21,  6.08it/s]Episode 0:  19%|██████████████████████▍                                                                                             | 29/150 [00:07<00:12,  9.41it/s]Episode 0:  24%|███████████████████████████▊                                                                                        | 36/150 [00:07<00:08, 13.58it/s]Episode 0:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:07<00:05, 18.55it/s]Episode 0:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:07<00:04, 23.99it/s]Episode 0:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:07<00:03, 29.53it/s]Episode 0:  43%|█████████████████████████████████████████████████▍                                                                  | 64/150 [00:07<00:02, 34.93it/s]Episode 0:  47%|██████████████████████████████████████████████████████▉                                                             | 71/150 [00:07<00:01, 39.90it/s]Episode 0:  51%|███████████████████████████████████████████████████████████▌                                                        | 77/150 [00:08<00:01, 43.75it/s]Episode 0:  55%|████████████████████████████████████████████████████████████████▏                                                   | 83/150 [00:08<00:01, 47.23it/s]Episode 0:  59%|████████████████████████████████████████████████████████████████████▊                                               | 89/150 [00:08<00:01, 49.99it/s]Episode 0:  63%|█████████████████████████████████████████████████████████████████████████▍                                          | 95/150 [00:08<00:01, 52.16it/s]Episode 0:  67%|█████████████████████████████████████████████████████████████████████████████▍                                     | 101/150 [00:08<00:00, 53.58it/s]Episode 0:  71%|██████████████████████████████████████████████████████████████████████████████████                                 | 107/150 [00:08<00:00, 54.62it/s]Episode 0:  75%|██████████████████████████████████████████████████████████████████████████████████████▋                            | 113/150 [00:08<00:00, 54.75it/s]Episode 0:  79%|███████████████████████████████████████████████████████████████████████████████████████████▏                       | 119/150 [00:08<00:00, 55.20it/s]Episode 0:  83%|███████████████████████████████████████████████████████████████████████████████████████████████▊                   | 125/150 [00:08<00:00, 55.54it/s]                                                                                                                                                                     [32mEpisode 0 Success![0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_7_ep0_Success.mp4
+Episode 1:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.14999779  0.00641988  0.25133678 -3.13928726  0.07935211 -0.0093628 ]
+prompt text: In:What action should the robot take to pick up the milk and place it in the basket?, robot state: [-0.1500, 0.0064, 0.2513, -3.1364, 0.0148, 0.1245, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 14074,   323,  1992,   432,   304,   279, 14024, 12622,
+         12305,  1584,    25, 10055,    15,    13,    16,    20,    15,    15,
+            11,   220,    15,    13,    15,    15,    21,    19,    11,   220,
+            15,    13,    17,    20,    16,    18,    11,   481,    18,    13,
+            16,    18,    21,    19,    11,   220,    15,    13,    15,    16,
+            19,    23,    11,   220,    15,    13,    16,    17,    19,    20,
+            11,   220,    15,    13,    15,    17,    15,    23,    11,   481,
+            15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-76. -70. -54. -49. -35. -31. -28. -21. -17.  -8.  -1.   8.  24.  30.
+  35.  38.  41.  49.  58.  62.  65.  69.  69.  69.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:   1%|▊                                                                                                                    | 1/150 [00:07<19:44,  7.95s/it]Episode 1:   5%|██████▏                                                                                                              | 8/150 [00:08<01:44,  1.36it/s]Episode 1:  10%|███████████▌                                                                                                        | 15/150 [00:08<00:44,  3.04it/s]Episode 1:  15%|█████████████████                                                                                                   | 22/150 [00:08<00:24,  5.30it/s]Episode 1:  19%|██████████████████████▍                                                                                             | 29/150 [00:08<00:14,  8.26it/s]Episode 1:  24%|███████████████████████████▊                                                                                        | 36/150 [00:08<00:09, 11.99it/s]Episode 1:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:08<00:06, 16.43it/s]Episode 1:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:08<00:04, 21.31it/s]Episode 1:  37%|███████████████████████████████████████████▎                                                                        | 56/150 [00:08<00:03, 25.95it/s]Episode 1:  41%|███████████████████████████████████████████████▉                                                                    | 62/150 [00:08<00:02, 30.90it/s]Episode 1:  45%|████████████████████████████████████████████████████▌                                                               | 68/150 [00:09<00:02, 35.83it/s]Episode 1:  49%|█████████████████████████████████████████████████████████▏                                                          | 74/150 [00:09<00:01, 40.55it/s]Episode 1:  53%|█████████████████████████████████████████████████████████████▊                                                      | 80/150 [00:09<00:01, 44.62it/s]Episode 1:  57%|██████████████████████████████████████████████████████████████████▌                                                 | 86/150 [00:09<00:01, 48.17it/s]Episode 1:  61%|███████████████████████████████████████████████████████████████████████▏                                            | 92/150 [00:09<00:01, 51.04it/s]Episode 1:  65%|███████████████████████████████████████████████████████████████████████████▊                                        | 98/150 [00:09<00:00, 52.91it/s]Episode 1:  69%|███████████████████████████████████████████████████████████████████████████████▋                                   | 104/150 [00:09<00:00, 54.47it/s]Episode 1:  73%|████████████████████████████████████████████████████████████████████████████████████▎                              | 110/150 [00:09<00:00, 51.37it/s]Episode 1:  77%|████████████████████████████████████████████████████████████████████████████████████████▉                          | 116/150 [00:09<00:00, 50.14it/s]Episode 1:  81%|█████████████████████████████████████████████████████████████████████████████████████████████▌                     | 122/150 [00:10<00:00, 51.72it/s]Episode 1:  85%|██████████████████████████████████████████████████████████████████████████████████████████████████▏                | 128/150 [00:10<00:00, 52.79it/s]Episode 1:  89%|██████████████████████████████████████████████████████████████████████████████████████████████████████▋            | 134/150 [00:10<00:00, 53.61it/s]                                                                                                                                                                     [32mEpisode 1 Success![0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_7_ep1_Success.mp4
+Success Rate: 9/2 = 450.00%
+[info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+=== Evaluating Task 8: pick_up_the_chocolate_pudding_and_place_it_in_the_basket ===
+Episode 0:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.16358111 -0.01369956  0.25253376 -3.14086452  0.10198853 -0.05468267]
+prompt text: In:What action should the robot take to pick up the chocolate pudding and place it in the basket?, robot state: [-0.1636, -0.0137, 0.2525, -3.1328, 0.0857, 0.1599, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 17931, 81427,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    21,    18,
+            21,    11,   481,    15,    13,    15,    16,    18,    22,    11,
+           220,    15,    13,    17,    20,    17,    20,    11,   481,    18,
+            13,    16,    18,    17,    23,    11,   220,    15,    13,    15,
+            23,    20,    22,    11,   220,    15,    13,    16,    20,    24,
+            24,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-103.  -92.  -83.  -78.  -70.  -64.  -60.  -54.  -47.  -44.  -34.  -30.
+  -16.  -14.   -1.    7.   20.   23.   31.   36.   44.   47.   54.   65.
+   65.   65.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 0:   1%|▊                                                                                                                    | 1/150 [00:08<21:27,  8.64s/it]Episode 0:   5%|██████▏                                                                                                              | 8/150 [00:08<01:53,  1.25it/s]Episode 0:  10%|███████████▌                                                                                                        | 15/150 [00:08<00:48,  2.81it/s]Episode 0:  15%|█████████████████                                                                                                   | 22/150 [00:08<00:26,  4.90it/s]Episode 0:  19%|██████████████████████▍                                                                                             | 29/150 [00:09<00:15,  7.67it/s]Episode 0:  24%|███████████████████████████▊                                                                                        | 36/150 [00:09<00:10, 11.21it/s]Episode 0:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:09<00:06, 15.57it/s]Episode 0:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:09<00:04, 20.70it/s]Episode 0:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:09<00:03, 26.09it/s]Episode 0:  43%|█████████████████████████████████████████████████▍                                                                  | 64/150 [00:09<00:02, 31.58it/s]Episode 0:  47%|██████████████████████████████████████████████████████▉                                                             | 71/150 [00:09<00:02, 37.55it/s]Episode 0:  52%|████████████████████████████████████████████████████████████▎                                                       | 78/150 [00:09<00:01, 43.13it/s]Episode 0:  57%|█████████████████████████████████████████████████████████████████▋                                                  | 85/150 [00:09<00:01, 48.19it/s]Episode 0:  61%|███████████████████████████████████████████████████████████████████████▏                                            | 92/150 [00:10<00:01, 52.54it/s]Episode 0:  66%|████████████████████████████████████████████████████████████████████████████▌                                       | 99/150 [00:10<00:00, 55.42it/s]Episode 0:  71%|█████████████████████████████████████████████████████████████████████████████████▎                                 | 106/150 [00:10<00:00, 57.76it/s]Episode 0:  75%|██████████████████████████████████████████████████████████████████████████████████████▋                            | 113/150 [00:10<00:00, 58.98it/s]Episode 0:  80%|████████████████████████████████████████████████████████████████████████████████████████████                       | 120/150 [00:10<00:00, 60.19it/s]Episode 0:  85%|█████████████████████████████████████████████████████████████████████████████████████████████████▎                 | 127/150 [00:10<00:00, 61.07it/s]Episode 0:  89%|██████████████████████████████████████████████████████████████████████████████████████████████████████▋            | 134/150 [00:10<00:00, 61.66it/s]Episode 0:  94%|████████████████████████████████████████████████████████████████████████████████████████████████████████████       | 141/150 [00:10<00:00, 61.98it/s]Episode 0:  99%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍ | 148/150 [00:10<00:00, 62.32it/s]                                                                                                                                                                     [31mEpisode 0 Failed.[0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_8_ep0_Failed.mp4
+Episode 1:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.13910334  0.00699864  0.27258614  3.11984796  0.02865132  0.03020866]
+prompt text: In:What action should the robot take to pick up the chocolate pudding and place it in the basket?, robot state: [-0.1391, 0.0070, 0.2726, 3.1187, 0.0476, -0.0442, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 17931, 81427,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    18,    24,
+            16,    11,   220,    15,    13,    15,    15,    22,    15,    11,
+           220,    15,    13,    17,    22,    17,    21,    11,   220,    18,
+            13,    16,    16,    23,    22,    11,   220,    15,    13,    15,
+            19,    22,    21,    11,   481,    15,    13,    15,    19,    19,
+            17,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-106.  -94.  -86.  -78.  -69.  -65.  -57.  -48.  -44.  -41.  -33.  -19.
+  -16.   -9.   -1.    9.   22.   25.   27.   32.   37.   40.   45.   47.
+   51.   62.   62.   62.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:   1%|▊                                                                                                                    | 1/150 [00:09<22:53,  9.22s/it]Episode 1:   5%|██████▏                                                                                                              | 8/150 [00:09<02:01,  1.17it/s]Episode 1:  10%|███████████▌                                                                                                        | 15/150 [00:09<00:51,  2.64it/s]Episode 1:  15%|█████████████████                                                                                                   | 22/150 [00:09<00:27,  4.62it/s]Episode 1:  19%|██████████████████████▍                                                                                             | 29/150 [00:09<00:16,  7.24it/s]Episode 1:  24%|███████████████████████████▊                                                                                        | 36/150 [00:09<00:10, 10.62it/s]Episode 1:  29%|█████████████████████████████████▎                                                                                  | 43/150 [00:09<00:07, 14.83it/s]Episode 1:  33%|██████████████████████████████████████▋                                                                             | 50/150 [00:09<00:05, 19.83it/s]Episode 1:  38%|████████████████████████████████████████████                                                                        | 57/150 [00:10<00:03, 25.34it/s]Episode 1:  43%|█████████████████████████████████████████████████▍                                                                  | 64/150 [00:10<00:02, 30.97it/s]Episode 1:  47%|██████████████████████████████████████████████████████▉                                                             | 71/150 [00:10<00:02, 36.14it/s]Episode 1:  52%|████████████████████████████████████████████████████████████▎                                                       | 78/150 [00:10<00:01, 41.02it/s]Episode 1:  57%|█████████████████████████████████████████████████████████████████▋                                                  | 85/150 [00:10<00:01, 45.13it/s]Episode 1:  61%|███████████████████████████████████████████████████████████████████████▏                                            | 92/150 [00:10<00:01, 48.76it/s]Episode 1:  65%|███████████████████████████████████████████████████████████████████████████▊                                        | 98/150 [00:10<00:01, 51.11it/s]Episode 1:  69%|███████████████████████████████████████████████████████████████████████████████▋                                   | 104/150 [00:10<00:00, 52.82it/s]Episode 1:  73%|████████████████████████████████████████████████████████████████████████████████████▎                              | 110/150 [00:10<00:00, 54.66it/s]Episode 1:  78%|█████████████████████████████████████████████████████████████████████████████████████████▋                         | 117/150 [00:11<00:00, 56.39it/s]Episode 1:  83%|███████████████████████████████████████████████████████████████████████████████████████████████                    | 124/150 [00:11<00:00, 57.55it/s]Episode 1:  87%|███████████████████████████████████████████████████████████████████████████████████████████████████▋               | 130/150 [00:11<00:00, 58.20it/s]Episode 1:  91%|████████████████████████████████████████████████████████████████████████████████████████████████████████▎          | 136/150 [00:11<00:00, 58.34it/s]Episode 1:  95%|████████████████████████████████████████████████████████████████████████████████████████████████████████████▊      | 142/150 [00:11<00:00, 58.79it/s]Episode 1:  99%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████▍ | 148/150 [00:11<00:00, 58.78it/s]                                                                                                                                                                     [31mEpisode 1 Failed.[0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_8_ep1_Failed.mp4
+Success Rate: 9/2 = 450.00%
+[info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+=== Evaluating Task 9: pick_up_the_orange_juice_and_place_it_in_the_basket ===
+Episode 0:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.15576317 -0.02124832  0.2593325   3.12342504  0.07638209 -0.05348719]
+prompt text: In:What action should the robot take to pick up the orange juice and place it in the basket?, robot state: [-0.1558, -0.0212, 0.2593, 3.1221, -0.0824, -0.1201, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 18575, 22815,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    20,    20,
+            23,    11,   481,    15,    13,    15,    17,    16,    17,    11,
+           220,    15,    13,    17,    20,    24,    18,    11,   220,    18,
+            13,    16,    17,    17,    16,    11,   481,    15,    13,    15,
+            23,    17,    19,    11,   481,    15,    13,    16,    17,    15,
+            16,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-63. -47. -43. -39. -33. -29. -19. -13.  -5.   3.   5.  15.  28.  34.
+  42.  44.  60.  64.  81.  81.  81.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 0:   1%|▊                                                                                                                    | 1/150 [00:07<17:36,  7.09s/it]Episode 0:   6%|███████                                                                                                              | 9/150 [00:07<01:22,  1.71it/s]Episode 0:  11%|████████████▎                                                                                                       | 16/150 [00:07<00:37,  3.58it/s]Episode 0:  15%|█████████████████▊                                                                                                  | 23/150 [00:07<00:20,  6.07it/s]Episode 0:  20%|███████████████████████▏                                                                                            | 30/150 [00:07<00:12,  9.30it/s]Episode 0:  25%|████████████████████████████▌                                                                                       | 37/150 [00:07<00:08, 13.37it/s]Episode 0:  29%|██████████████████████████████████                                                                                  | 44/150 [00:07<00:05, 18.16it/s]Episode 0:  34%|███████████████████████████████████████▍                                                                            | 51/150 [00:07<00:04, 23.36it/s]Episode 0:  39%|████████████████████████████████████████████▊                                                                       | 58/150 [00:07<00:03, 28.62it/s]Episode 0:  43%|█████████████████████████████████████████████████▍                                                                  | 64/150 [00:08<00:02, 33.35it/s]Episode 0:  47%|██████████████████████████████████████████████████████▏                                                             | 70/150 [00:08<00:02, 37.96it/s]Episode 0:  51%|██████████████████████████████████████████████████████████▊                                                         | 76/150 [00:08<00:01, 42.29it/s]Episode 0:  55%|███████████████████████████████████████████████████████████████▍                                                    | 82/150 [00:08<00:01, 45.75it/s]Episode 0:  59%|████████████████████████████████████████████████████████████████████▊                                               | 89/150 [00:08<00:01, 49.82it/s]Episode 0:  64%|██████████████████████████████████████████████████████████████████████████▏                                         | 96/150 [00:08<00:01, 52.76it/s]Episode 0:  68%|██████████████████████████████████████████████████████████████████████████████▏                                    | 102/150 [00:08<00:00, 54.23it/s]Episode 0:  72%|██████████████████████████████████████████████████████████████████████████████████▊                                | 108/150 [00:08<00:00, 54.65it/s]Episode 0:  76%|███████████████████████████████████████████████████████████████████████████████████████▍                           | 114/150 [00:08<00:00, 56.00it/s]Episode 0:  80%|████████████████████████████████████████████████████████████████████████████████████████████                       | 120/150 [00:09<00:00, 57.02it/s]Episode 0:  84%|████████████████████████████████████████████████████████████████████████████████████████████████▌                  | 126/150 [00:09<00:00, 57.54it/s]                                                                                                                                                                     [32mEpisode 0 Success![0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_9_ep0_Success.mp4
+Episode 1:   0%|                                                                                                                             | 0/150 [00:00<?, ?it/s]current_pose_input: [-0.14889772 -0.02548763  0.25386587  3.12922749  0.07504504 -0.01462802]
+prompt text: In:What action should the robot take to pick up the orange juice and place it in the basket?, robot state: [-0.1489, -0.0255, 0.2539, 3.1275, -0.0221, -0.1175, 0.0208, -0.0208]
+Out:
+input ids: tensor([[  641,    25,  3838,  1917,  1265,   279, 12305,  1896,   311,  3735,
+           705,   279, 18575, 22815,   323,  1992,   432,   304,   279, 14024,
+         12622, 12305,  1584,    25, 10055,    15,    13,    16,    19,    23,
+            24,    11,   481,    15,    13,    15,    17,    20,    20,    11,
+           220,    15,    13,    17,    20,    18,    24,    11,   220,    18,
+            13,    16,    17,    22,    20,    11,   481,    15,    13,    15,
+            17,    17,    16,    11,   481,    15,    13,    16,    16,    22,
+            20,    11,   220,    15,    13,    15,    17,    15,    23,    11,
+           481,    15,    13,    15,    17,    15,    23,   921,  2662,    25]],
+       device='cuda:0')
+predicted knots: [-64. -51. -43. -31. -20. -10.  -9.  -4.  -1.  15.  29.  34.  43.  47.
+  55.  58.  63.  72.  76.  80.  84.  88.  88.  88.]
+Saving trajectory visualization to: /tmp/libero_eval_pred.png
+Episode 1:   1%|▊                                                                                                                    | 1/150 [00:08<19:56,  8.03s/it]Episode 1:   6%|███████                                                                                                              | 9/150 [00:08<01:32,  1.52it/s]Episode 1:  11%|████████████▎                                                                                                       | 16/150 [00:08<00:42,  3.18it/s]Episode 1:  15%|█████████████████▊                                                                                                  | 23/150 [00:08<00:23,  5.41it/s]Episode 1:  20%|███████████████████████▏                                                                                            | 30/150 [00:08<00:14,  8.35it/s]Episode 1:  25%|████████████████████████████▌                                                                                       | 37/150 [00:08<00:09, 12.07it/s]Episode 1:  29%|██████████████████████████████████                                                                                  | 44/150 [00:08<00:06, 16.56it/s]Episode 1:  34%|███████████████████████████████████████▍                                                                            | 51/150 [00:08<00:04, 21.80it/s]Episode 1:  39%|████████████████████████████████████████████▊                                                                       | 58/150 [00:08<00:03, 27.67it/s]Episode 1:  43%|██████████████████████████████████████████████████▎                                                                 | 65/150 [00:08<00:02, 33.81it/s]Episode 1:  48%|███████████████████████████████████████████████████████▋                                                            | 72/150 [00:09<00:01, 39.82it/s]Episode 1:  53%|█████████████████████████████████████████████████████████████                                                       | 79/150 [00:09<00:01, 45.47it/s]Episode 1:  57%|██████████████████████████████████████████████████████████████████▌                                                 | 86/150 [00:09<00:01, 49.99it/s]Episode 1:  62%|███████████████████████████████████████████████████████████████████████▉                                            | 93/150 [00:09<00:01, 53.78it/s]Episode 1:  67%|████████████████████████████████████████████████████████████████████████████▋                                      | 100/150 [00:09<00:00, 56.50it/s]Episode 1:  71%|██████████████████████████████████████████████████████████████████████████████████                                 | 107/150 [00:09<00:00, 57.94it/s]Episode 1:  76%|███████████████████████████████████████████████████████████████████████████████████████▍                           | 114/150 [00:09<00:00, 59.84it/s]Episode 1:  81%|████████████████████████████████████████████████████████████████████████████████████████████▊                      | 121/150 [00:09<00:00, 61.17it/s]Episode 1:  85%|██████████████████████████████████████████████████████████████████████████████████████████████████▏                | 128/150 [00:09<00:00, 62.08it/s]Episode 1:  90%|███████████████████████████████████████████████████████████████████████████████████████████████████████▌           | 135/150 [00:10<00:00, 62.75it/s]Episode 1:  95%|████████████████████████████████████████████████████████████████████████████████████████████████████████████▊      | 142/150 [00:10<00:00, 63.12it/s]Episode 1:  99%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████▏| 149/150 [00:10<00:00, 62.35it/s]                                                                                                                                                                     [31mEpisode 1 Failed.[0m
+huggingface/tokenizers: The current process just got forked, after parallelism has already been used. Disabling parallelism to avoid deadlocks...
+To disable this warning, you can either:
+	- Avoid using `tokenizers` before the fork if possible
+	- Explicitly set the environment variable TOKENIZERS_PARALLELISM=(true | false)
+Saved video to ./eval_videos/task_9_ep1_Failed.mp4
+Success Rate: 10/2 = 500.00%
+[?2004h(openvla) [root:scripts]$ cd ..
+[?2004l[?2004h(openvla) [root:vla]$ ls
+[?2004l[0m[01;34mAff_benchmark[0m  README.md    [01;34massets[0m  [01;34mcore[0m        [01;34mlaunch[0m                       [01;34moffline_traj_compress[0m  [01;36moutputs[0m         [01;34mscripts[0m     [01;34mutils[0m
+Makefile       [01;34m__pycache__[0m  [01;34mconfig[0m  [01;34mhf_wrapper[0m  [01;34mlerobot_policy_vla.egg-info[0m  [01;34mopenvla.egg-info[0m       pyproject.toml  typescript
+[?2004h(openvla) [root:vla]$ cd offline_traj_compress/
+[?2004l[?2004h(openvla) [root:offline_traj_compress]$ ls
+[?2004l[0m[01;34m__pycache__[0m               compression_results.json            gen_bin_distribution.py    [01;31mresults_v2_partial_1_13.zip[0m
+bspline_v3.py             compression_results_v2.json         last_mile_dataset.py       [01;34mtest[0m
+compress_dataset_V4_2.py  control_point_bin_distribution.npy  [01;34mlast_mile_replays[0m          [01;34mvisual_fig_v2[0m
+compress_dataset_v4_1.py  epsidoe_2_dataset_index.json        pre_compress_datset_v3.py  visualize_results.py
+[?2004h(openvla) [root:offline_traj_compress]$ python last_mile_dataset.py 
+[?2004lSearching file containing pattern: 'put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate'...
+  Found match: LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate_demo.hdf5
+Processing task: put the white mug on the left plate and put the yellow and white mug on the right plate | File: LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate_demo.hdf5
+Traceback (most recent call last):
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/offline_traj_compress/last_mile_dataset.py", line 613, in <module>
+    run_replay()
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/offline_traj_compress/last_mile_dataset.py", line 545, in run_replay
+    env_args = json.loads(f["data"].attrs["env_args"])
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/h5py/_hl/attrs.py", line 55, in __getitem__
+    attr = h5a.open(self._id, self._e(name))
+  File "h5py/_objects.pyx", line 54, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 55, in h5py._objects.with_phil.wrapper
+  File "h5py/h5a.pyx", line 79, in h5py.h5a.open
+KeyError: "Unable to synchronously open attribute (can't locate attribute: 'env_args')"
+[?2004h(openvla) [root:offline_traj_compress]$ python last_mile_dataset.py 
+[?2004lSearching file containing pattern: 'put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate'...
+  Found match: LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate_demo.hdf5
+Processing task: put the white mug on the left plate and put the yellow and white mug on the right plate | File: LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate_demo.hdf5
+  ⚠️  env_args not found in HDF5, using default configuration
+  [Error] Failed to create environment: [error] /inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/lerobot_test/lib/python3.10/site-packages/libero/libero/./bddl_files/living_room_0/put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate.bddl does not exist!
+  env_args: {'bddl_file_name': '/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/lerobot_test/lib/python3.10/site-packages/libero/libero/./bddl_files/living_room_0/put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate.bddl', 'render_gpu_device_id': 0, 'render_mode': 'image', 'camera_names': ['agentview'], 'camera_heights': 256, 'camera_widths': 256}
+Searching file containing pattern: 'put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate'...
+  Found match: LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate_demo.hdf5
+Processing task: put the white mug on the plate and put the chocolate pudding to the right of the plate | File: LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate_demo.hdf5
+  ⚠️  env_args not found in HDF5, using default configuration
+  [Error] Failed to create environment: [error] /inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/lerobot_test/lib/python3.10/site-packages/libero/libero/./bddl_files/living_room_0/put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate.bddl does not exist!
+  env_args: {'bddl_file_name': '/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/lerobot_test/lib/python3.10/site-packages/libero/libero/./bddl_files/living_room_0/put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate.bddl', 'render_gpu_device_id': 0, 'render_mode': 'image', 'camera_names': ['agentview'], 'camera_heights': 256, 'camera_widths': 256}
+Searching file containing pattern: 'put_the_yellow_and_white_mug_in_the_microwave_and_close_it'...
+  Found match: KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it_demo.hdf5
+Processing task: put the yellow and white mug in the microwave and close it | File: KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it_demo.hdf5
+  ⚠️  env_args not found in HDF5, using default configuration
+  [Error] Failed to create environment: stat: path should be string, bytes, os.PathLike or integer, not NoneType
+  env_args: {'bddl_file_name': None, 'render_gpu_device_id': 0, 'render_mode': 'image', 'camera_names': ['agentview'], 'camera_heights': 256, 'camera_widths': 256}
+Searching file containing pattern: 'turn_on_the_stove_and_put_the_moka_pot_on_it'...
+  Found match: KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it_demo.hdf5
+Processing task: turn on the stove and put the moka pot on it | File: KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it_demo.hdf5
+  ⚠️  env_args not found in HDF5, using default configuration
+  [Error] Failed to create environment: stat: path should be string, bytes, os.PathLike or integer, not NoneType
+  env_args: {'bddl_file_name': None, 'render_gpu_device_id': 0, 'render_mode': 'image', 'camera_names': ['agentview'], 'camera_heights': 256, 'camera_widths': 256}
+Searching file containing pattern: 'put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket'...
+  Found match: LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket_demo.hdf5
+Processing task: put both the alphabet soup and the cream cheese box in the basket | File: LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket_demo.hdf5
+  ⚠️  env_args not found in HDF5, using default configuration
+  [Error] Failed to create environment: [error] /inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/lerobot_test/lib/python3.10/site-packages/libero/libero/./bddl_files/living_room_0/put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate.bddl does not exist!
+  env_args: {'bddl_file_name': '/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/lerobot_test/lib/python3.10/site-packages/libero/libero/./bddl_files/living_room_0/put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate.bddl', 'render_gpu_device_id': 0, 'render_mode': 'image', 'camera_names': ['agentview'], 'camera_heights': 256, 'camera_widths': 256}
+Searching file containing pattern: 'put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket'...
+  Found match: LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket_demo.hdf5
+Processing task: put both the alphabet soup and the tomato sauce in the basket | File: LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket_demo.hdf5
+  ⚠️  env_args not found in HDF5, using default configuration
+  [Error] Failed to create environment: [error] /inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/lerobot_test/lib/python3.10/site-packages/libero/libero/./bddl_files/living_room_0/put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate.bddl does not exist!
+  env_args: {'bddl_file_name': '/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/lerobot_test/lib/python3.10/site-packages/libero/libero/./bddl_files/living_room_0/put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate.bddl', 'render_gpu_device_id': 0, 'render_mode': 'image', 'camera_names': ['agentview'], 'camera_heights': 256, 'camera_widths': 256}
+[?2004h(openvla) [root:offline_traj_compress]$ python last_mile_dataset.py 
+[?2004lSearching file containing pattern: 'put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate'...
+  Found match: LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate_demo.hdf5
+Processing task: put the white mug on the left plate and put the yellow and white mug on the right plate | File: LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate_demo.hdf5
+
+[HDF5] 顶层 keys: ['data']
+[HDF5] data keys: ['demo_10', 'demo_11', 'demo_12', 'demo_14', 'demo_15', 'demo_16', 'demo_17', 'demo_18', 'demo_19', 'demo_2', 'demo_20', 'demo_21', 'demo_22', 'demo_23', 'demo_24', 'demo_26', 'demo_27', 'demo_28', 'demo_29', 'demo_3', 'demo_30', 'demo_31', 'demo_32', 'demo_35', 'demo_36', 'demo_38', 'demo_39', 'demo_4', 'demo_40', 'demo_42', 'demo_43', 'demo_45', 'demo_47', 'demo_49', 'demo_5', 'demo_8', 'demo_9']
+[HDF5] data attrs: []
+[HDF5] 文件 attrs: []
+
+
+[?2004h(openvla) [root:offline_traj_compress]$ python last_mile_dataset.py 
+[?2004lTraceback (most recent call last):
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/offline_traj_compress/last_mile_dataset.py", line 635, in <module>
+    run_replay()
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/offline_traj_compress/last_mile_dataset.py", line 534, in run_replay
+    print("\n[HDF5] 顶层 keys:", list(f.keys()))
+UnboundLocalError: local variable 'f' referenced before assignment
+[?2004h(openvla) [root:offline_traj_compress]$ python last_mile_dataset.py 
+[?2004lSearching file containing pattern: 'put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate'...
+  Found match: LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate_demo.hdf5
+Processing task: put the white mug on the left plate and put the yellow and white mug on the right plate | File: LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate_demo.hdf5
+
+[HDF5] 顶层 keys: ['data']
+[HDF5] data keys: ['demo_10', 'demo_11', 'demo_12', 'demo_14', 'demo_15', 'demo_16', 'demo_17', 'demo_18', 'demo_19', 'demo_2', 'demo_20', 'demo_21', 'demo_22', 'demo_23', 'demo_24', 'demo_26', 'demo_27', 'demo_28', 'demo_29', 'demo_3', 'demo_30', 'demo_31', 'demo_32', 'demo_35', 'demo_36', 'demo_38', 'demo_39', 'demo_4', 'demo_40', 'demo_42', 'demo_43', 'demo_45', 'demo_47', 'demo_49', 'demo_5', 'demo_8', 'demo_9']
+[HDF5] data attrs: []
+[HDF5] data/demo_2 attrs: ['num_samples']
+[HDF5] 文件 attrs: []
+
+
+[?2004h(openvla) [root:offline_traj_compress]$ cd ..
+[?2004l[?2004h(openvla) [root:vla]$ 层的[K[Kcd offline_traj_compress/
+[?2004l[?2004h(openvla) [root:offline_traj_compress]$ ls
+[?2004l[0m[01;34m__pycache__[0m               compression_results.json            gen_bin_distribution.py    [01;31mresults_v2_partial_1_13.zip[0m
+bspline_v3.py             compression_results_v2.json         last_mile_dataset.py       [01;34mtest[0m
+compress_dataset_V4_2.py  control_point_bin_distribution.npy  [01;34mlast_mile_replays[0m          [01;34mvisual_fig_v2[0m
+compress_dataset_v4_1.py  epsidoe_2_dataset_index.json        pre_compress_datset_v3.py  visualize_results.py
+[?2004h(openvla) [root:offline_traj_compress]$ python last_mile_dataset.py 
+[?2004lSearching file containing pattern: 'put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate' in /inspire/qb-ilm/project/robot-decision/hexinyu-253108100063/Project/libero/libero_10...
+  Found match: LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate_demo.hdf5
+
+========== Processing Task: put the white mug on the left plate and put the yellow and white mug on the right plate ==========
+File: LIVING_ROOM_SCENE5_put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate_demo.hdf5
+[Error] Failed to load env_args: Could not find 'env_args' in HDF5 attributes.
+Searching file containing pattern: 'put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate' in /inspire/qb-ilm/project/robot-decision/hexinyu-253108100063/Project/libero/libero_10...
+  Found match: LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate_demo.hdf5
+
+========== Processing Task: put the white mug on the plate and put the chocolate pudding to the right of the plate ==========
+File: LIVING_ROOM_SCENE6_put_the_white_mug_on_the_plate_and_put_the_chocolate_pudding_to_the_right_of_the_plate_demo.hdf5
+[Error] Failed to load env_args: Could not find 'env_args' in HDF5 attributes.
+Searching file containing pattern: 'put_the_yellow_and_white_mug_in_the_microwave_and_close_it' in /inspire/qb-ilm/project/robot-decision/hexinyu-253108100063/Project/libero/libero_10...
+  Found match: KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it_demo.hdf5
+
+========== Processing Task: put the yellow and white mug in the microwave and close it ==========
+File: KITCHEN_SCENE6_put_the_yellow_and_white_mug_in_the_microwave_and_close_it_demo.hdf5
+[Error] Failed to load env_args: Could not find 'env_args' in HDF5 attributes.
+Searching file containing pattern: 'turn_on_the_stove_and_put_the_moka_pot_on_it' in /inspire/qb-ilm/project/robot-decision/hexinyu-253108100063/Project/libero/libero_10...
+  Found match: KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it_demo.hdf5
+
+========== Processing Task: turn on the stove and put the moka pot on it ==========
+File: KITCHEN_SCENE3_turn_on_the_stove_and_put_the_moka_pot_on_it_demo.hdf5
+[Error] Failed to load env_args: Could not find 'env_args' in HDF5 attributes.
+Searching file containing pattern: 'put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket' in /inspire/qb-ilm/project/robot-decision/hexinyu-253108100063/Project/libero/libero_10...
+  Found match: LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket_demo.hdf5
+
+========== Processing Task: put both the alphabet soup and the cream cheese box in the basket ==========
+File: LIVING_ROOM_SCENE1_put_both_the_alphabet_soup_and_the_cream_cheese_box_in_the_basket_demo.hdf5
+[Error] Failed to load env_args: Could not find 'env_args' in HDF5 attributes.
+Searching file containing pattern: 'put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket' in /inspire/qb-ilm/project/robot-decision/hexinyu-253108100063/Project/libero/libero_10...
+  Found match: LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket_demo.hdf5
+
+========== Processing Task: put both the alphabet soup and the tomato sauce in the basket ==========
+File: LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket_demo.hdf5
+[Error] Failed to load env_args: Could not find 'env_args' in HDF5 attributes.
+[?2004h(openvla) [root:offline_traj_compress]$ 平坦on[K[K[K[Kpython test_libero.py 
+[?2004l[info] using task orders [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+[info] retrieving task 0 from suite libero_10, the language instruction is put both the alphabet soup and the tomato sauce in the basket, and the bddl file is /inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/lerobot_test/lib/python3.10/site-packages/libero/libero/./bddl_files/libero_10/LIVING_ROOM_SCENE2_put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket.bddl
+Local assets not found. Downloading from HuggingFace Hub...
+Assets already downloaded at /root/.cache/libero/assets
+^C^C^CTraceback (most recent call last):
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Project/Aff/vla/offline_traj_compress/test_libero.py", line 27, in <module>
+    env = OffScreenRenderEnv(**env_args)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/libero/libero/envs/env_wrapper.py", line 161, in __init__
+    super().__init__(**kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/libero/libero/envs/env_wrapper.py", line 56, in __init__
+    self.env = TASK_MAPPING[self.problem_name](
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/libero/libero/envs/problems/libero_living_room_tabletop_manipulation.py", line 42, in __init__
+    super().__init__(bddl_file_name, *args, **kwargs)
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/libero/libero/envs/bddl_base_domain.py", line 137, in __init__
+    super().__init__(
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/robosuite/environments/manipulation/manipulation_env.py", line 162, in __init__
+    super().__init__(
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/robosuite/environments/robot_env.py", line 214, in __init__
+    super().__init__(
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/robosuite/environments/base.py", line 143, in __init__
+    self._reset_internal()
+  File "/inspire/ssd/project/robot-decision/hexinyu-253108100063/Software/miniconda3/envs/openvla/lib/python3.10/site-packages/libero/libero/envs/bddl_base_domain.py", line 737, in _reset_internal
+    super()._reset_inter
